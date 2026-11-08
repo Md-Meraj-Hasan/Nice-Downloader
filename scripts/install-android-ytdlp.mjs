@@ -13,7 +13,7 @@ if (!gradle.includes("dev.ffmpegkit-maintained:yt-dlp-android")) {
 const variablesPath = "android/variables.gradle";
 if (fs.existsSync(variablesPath)) {
   let variables = fs.readFileSync(variablesPath, "utf8");
-  variables = variables.replace(/minSdkVersion\\s*=\\s*23/g, "minSdkVersion = 24");
+  variables = variables.replace(/minSdkVersion\s*=\s*23/g, "minSdkVersion = 24");
   fs.writeFileSync(variablesPath, variables);
 }
 const namespace = gradle.match(/namespace\s+['"]([^'"]+)['"]/ )?.[1];
