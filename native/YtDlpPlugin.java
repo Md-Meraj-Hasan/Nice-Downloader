@@ -59,7 +59,6 @@ public class YtDlpPlugin extends Plugin {
                         .addOption("--no-playlist")
                         .addOption("--no-warnings")
                         .addOption("--newline");
-                if ("audio".equals(quality)) request.addOption("-x");
                 Future<YtDlpResponse> future = YtDlp.executeAsync(request, (progress, eta, line) -> {
                     JSObject event = new JSObject();
                     event.put("progress", Math.max(0, Math.min(100, progress)));
