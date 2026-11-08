@@ -10,6 +10,12 @@ if (!gradle.includes("dev.ffmpegkit-maintained:yt-dlp-android")) {
   gradle = gradle.replace("dependencies {", "dependencies {\n" + dependency);
   fs.writeFileSync(gradlePath, gradle);
 }
+const variablesPath = "android/variables.gradle";
+if (fs.existsSync(variablesPath)) {
+  let variables = fs.readFileSync(variablesPath, "utf8");
+  variables = variables.replace(/minSdkVersion\\s*=\\s*23/g, "minSdkVersion = 24");
+  fs.writeFileSync(variablesPath, variables);
+}
 const namespace = gradle.match(/namespace\s+['"]([^'"]+)['"]/ )?.[1];
 if (!namespace) throw new Error("Android namespace not found");
 const javaDir = path.join("android/app/src/main/java", ...namespace.split("."));
