@@ -1,0 +1,8 @@
+{
+  "appId": "com.meraj.nicedownloader",
+  "appName": "Nice Downloader",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  }
+}
