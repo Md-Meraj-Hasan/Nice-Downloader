@@ -57,6 +57,13 @@ public class YtDlpPlugin extends Plugin {
                         .setOutputTemplate(template)
                         .addOption("-f", format)
                         .addOption("--no-playlist")
+                        // Parallel HLS/DASH fragment fetching; this does not override server or network limits.
+                        .addOption("--concurrent-fragments", "8")
+                        .addOption("--retries", "10")
+                        .addOption("--fragment-retries", "10")
+                        .addOption("--file-access-retries", "5")
+                        .addOption("--socket-timeout", "30")
+                        .addOption("--buffer-size", "16K")
                         .addOption("--no-warnings")
                         .addOption("--newline");
                 Future<YtDlpResponse> future = YtDlp.executeAsync(request, (progress, eta, line) -> {
