@@ -181,7 +181,7 @@ button.addEventListener("click", async () => {
   if (!Capacitor.isNativePlatform()) { status.textContent = "Native downloading is available in the Android APK. Use the Browser tab for web links."; return; }
   browserBtn.hidden = true;
   button.disabled = true;
-  button.innerHTML = '<span class="primary-icon">${icon("download")}</span> Starting…';
+  button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Starting…';
   progressWrap.hidden = false;
   progressBar.style.width = "0%";
   progressValue.textContent = "0%";
