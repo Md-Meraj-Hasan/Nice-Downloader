@@ -19,6 +19,7 @@ A private, ad-free Android media downloader.
 - URL validation and quality preset selector
 - Native on-device yt-dlp download bridge
 - Live progress events and completion/failure status
+- Optional import of a Netscape-format YouTube cookies.txt file; only YouTube-domain cookies are retained in private app storage, with a clear option
 - Faster HLS/DASH downloads using 8 concurrent fragments, with retries, socket timeout, and a larger I/O buffer
 - Output is currently stored in the app-specific external Downloads/NiceDownloader folder. A later storage milestone will add a user-selected public Downloads folder and download history.
 
@@ -27,7 +28,7 @@ A private, ad-free Android media downloader.
 - Up to 1080p / 720p / 480p (only if the source provides a compatible format)
 - Audio-only source stream
 
-Speed depends on the source server, selected format, device, and network. Parallel fragments can improve HLS/DASH downloads when the source supports them; ordinary single-stream HTTP downloads may not become faster. The app cannot defeat Wi-Fi firewalls, ISP throttling, server rate limits, or blocked domains, and it does not attempt to bypass network access controls. Use a network and source you are authorized to access. Actual website compatibility changes over time. A platform may require an authorized session, may block a particular Android runtime, or may prohibit downloads. The free yt-dlp Android runtime does not include browser TLS impersonation; some sites may therefore fail. No guarantee is made that every link or every resolution works.
+Speed depends on the source server, selected format, device, and network. Parallel fragments can improve HLS/DASH downloads when the source supports them; ordinary single-stream HTTP downloads may not become faster. The app cannot defeat Wi-Fi firewalls, ISP throttling, server rate limits, or blocked domains, and it does not attempt to bypass network access controls. Use a network and source you are authorized to access. Actual website compatibility changes over time. A platform may require an authorized session, may block a particular Android runtime, or may prohibit downloads. The free yt-dlp Android runtime does not include browser TLS impersonation; some sites may therefore fail. Optional YouTube cookies may help when an authorized session is required, but cookies do not fix network TLS disconnects or impersonate Chrome. No guarantee is made that every link or every resolution works.
 
 ## Device requirements
 The bundled yt-dlp Android runtime currently supports arm64-v8a and x86_64. It does not support 32-bit-only ARM devices. The embedded runtime increases APK size substantially (roughly 60–80 MB before other app content).
