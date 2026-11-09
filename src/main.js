@@ -158,11 +158,20 @@ $("#themeBtn").addEventListener("click", toggleTheme);
 $("#settingsThemeBtn").addEventListener("click", toggleTheme);
 
 $("#importCookiesBtn").addEventListener("click", async () => {
-  if (!Capacitor.isNativePlatform()) { $("#cookieStatus").textContent = "Available in the Android APK."; return; }
+  const cookieStatus = $("#cookieStatus");
+  if (!Capacitor.isNativePlatform()) { cookieStatus.textContent = "Cookie import is available in the installed Android APK."; return; }
+  cookieStatus.textContent = "Opening Android file picker… Choose a Netscape-format cookies.txt file.";
+  $("#importCookiesBtn").disabled = true;
   try {
     const result = await YtDlp.pickCookies();
-    $("#cookieStatus").textContent = "Imported " + result.cookies + " YouTube cookies. Stored privately on this device."; 
-  } catch (error) { $("#cookieStatus").textContent = error?.message || "Cookie import cancelled or failed."; }
+    if (!result || result.imported !== true) throw new Error("Android did not confirm the cookie import. Please try again.");
+    cookieStatus.textContent = "✓ Imported " + result.cookies + " cookies from " + (result.fileName || "selected file") + ". Saved privately on this device.";
+  } catch (error) {
+    const message = error?.message || error?.error || String(error);
+    cookieStatus.textContent = "Import not completed: " + message;
+  } finally {
+    $("#importCookiesBtn").disabled = false;
+  }
 });
 $("#clearCookiesBtn").addEventListener("click", async () => {
   if (!Capacitor.isNativePlatform()) return;
