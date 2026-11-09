@@ -1,6 +1,7 @@
 package __PACKAGE__;
 
 import android.net.Uri;
+import android.content.Intent;
 import android.os.Environment;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -17,6 +18,29 @@ import java.util.concurrent.Future;
 @CapacitorPlugin(name = "YtDlp")
 public class YtDlpPlugin extends Plugin {
     private static boolean initialized = false;
+
+
+    @PluginMethod
+    public void openInBrowser(PluginCall call) {
+        String rawUrl = call.getString("url");
+        if (rawUrl == null || rawUrl.trim().isEmpty()) {
+            call.reject("A web link is required.");
+            return;
+        }
+        Uri uri = Uri.parse(rawUrl.trim());
+        if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) || uri.getHost() == null) {
+            call.reject("Only valid HTTP or HTTPS links are supported.");
+            return;
+        }
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Could not open the link in a browser: " + e.getMessage());
+        }
+    }
 
     @PluginMethod
     public void download(PluginCall call) {
