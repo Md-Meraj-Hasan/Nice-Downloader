@@ -12,7 +12,8 @@ app.innerHTML = `
       <div class="urlbox"><input id="urlInput" type="url" placeholder="Paste a link here…" autocomplete="url"><button id="pasteBtn" class="paste">Paste</button></div>
       <div class="quality-row"><label for="quality">QUALITY / FORMAT</label><select id="quality"><option value="best">Best available</option><option value="1080">Up to 1080p</option><option value="720">Up to 720p</option><option value="480">Up to 480p</option><option value="audio">Audio only (source format)</option></select></div>
       <button id="inspectBtn" class="primary"><span>↓</span> Start download</button>
-      <p class="hint" id="status" role="status">Only download content you own or are authorized to save.</p>\n      <button id="browserBtn" class="browser-fallback" hidden>Open this link in Chrome / browser</button>
+      <p class="hint" id="status" role="status">Only download content you own or are authorized to save.</p>
+      <button id="browserBtn" class="browser-fallback" hidden>Open this link in Chrome / browser</button>
       <div class="progress-wrap" id="progressWrap" hidden><div class="progress-head"><span id="progressLabel">Preparing…</span><b id="progressValue">0%</b></div><div class="progress-track"><div id="progressBar"></div></div></div>
     </section>
     <section class="supported"><div class="section-title">POPULAR SOURCES</div><div class="sources"><span>▶ YouTube</span><span>f Facebook</span><span>◎ Instagram</span><span>♪ TikTok</span><span>𝕏 X</span><span>＋ More sites</span></div><p class="hint">Supported sites depend on the bundled yt-dlp extractor and each platform's current access rules.</p></section>
