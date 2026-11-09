@@ -58,6 +58,7 @@ app.innerHTML = `
         <label for="urlInput">PASTE YOUR MEDIA LINK</label>
         <div class="urlbox"><span class="url-icon">${icon("link")}</span><input id="urlInput" type="url" placeholder="Paste video or audio link here…" autocomplete="url"><button id="pasteBtn" class="paste-btn" aria-label="Paste from clipboard">${icon("paste")}</button></div>
         <div class="quality-row"><label for="quality">QUALITY</label><select id="quality"><option value="best">Best available</option><option value="1080">Up to 1080p</option><option value="720">Up to 720p</option><option value="480">Up to 480p</option><option value="audio">Audio only</option></select></div>
+        <div class="cookie-tools"><button id="importCookiesBtn" class="cookie-btn">Import YouTube cookies.txt</button><button id="clearCookiesBtn" class="cookie-clear">Clear</button></div><p id="cookieStatus" class="cookie-status">Optional: import your own YouTube cookies file if a signed-in session is required.</p>
         <button id="downloadBtn" class="primary"><span class="primary-icon">${icon("download")}</span> Download now <span class="button-arrow">→</span></button>
         <p class="status" id="status" role="status">Only download content you own or are allowed to save.</p>
         <button id="browserBtn" class="browser-fallback" hidden>Open link in Chrome / browser ↗</button>
@@ -156,6 +157,18 @@ document.querySelectorAll("[data-tab]").forEach(item => item.addEventListener("c
 $("#themeBtn").addEventListener("click", toggleTheme);
 $("#settingsThemeBtn").addEventListener("click", toggleTheme);
 
+$("#importCookiesBtn").addEventListener("click", async () => {
+  if (!Capacitor.isNativePlatform()) { $("#cookieStatus").textContent = "Available in the Android APK."; return; }
+  try {
+    const result = await YtDlp.pickCookies();
+    $("#cookieStatus").textContent = "Imported " + result.cookies + " YouTube cookies. Stored privately on this device."; 
+  } catch (error) { $("#cookieStatus").textContent = error?.message || "Cookie import cancelled or failed."; }
+});
+$("#clearCookiesBtn").addEventListener("click", async () => {
+  if (!Capacitor.isNativePlatform()) return;
+  try { await YtDlp.clearCookies(); $("#cookieStatus").textContent = "Saved YouTube cookies cleared."; }
+  catch (error) { $("#cookieStatus").textContent = error?.message || "Could not clear cookies."; }
+});
 $("#pasteBtn").addEventListener("click", async () => {
   try { input.value = await navigator.clipboard.readText(); status.textContent = input.value ? "Link pasted. Ready to download." : "Clipboard is empty."; }
   catch { status.textContent = "Clipboard unavailable. Paste your link manually."; }
