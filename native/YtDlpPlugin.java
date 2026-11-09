@@ -14,6 +14,8 @@ import dev.ffmpegkit_maintained.ytdlp.YtDlpRequest;
 import dev.ffmpegkit_maintained.ytdlp.YtDlpResponse;
 import java.io.File;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @CapacitorPlugin(name = "YtDlp")
 public class YtDlpPlugin extends Plugin {
@@ -90,6 +92,11 @@ public class YtDlpPlugin extends Plugin {
                         .addOption("--buffer-size", "16K")
                         .addOption("--no-warnings")
                         .addOption("--newline");
+                JSObject connecting = new JSObject();
+                connecting.put("progress", 0);
+                connecting.put("etaSeconds", 0);
+                connecting.put("message", "Connecting to source and reading media information…");
+                notifyListeners("downloadProgress", connecting);
                 Future<YtDlpResponse> future = YtDlp.executeAsync(request, (progress, eta, line) -> {
                     JSObject event = new JSObject();
                     event.put("progress", Math.max(0, Math.min(100, progress)));
@@ -97,7 +104,15 @@ public class YtDlpPlugin extends Plugin {
                     event.put("message", line == null ? "" : line);
                     notifyListeners("downloadProgress", event);
                 });
-                YtDlpResponse response = future.get();
+                YtDlpResponse response;
+                try {
+                    // Avoid leaving the UI waiting forever if the source/network never responds.
+                    response = future.get(150, TimeUnit.SECONDS);
+                } catch (TimeoutException timeout) {
+                    future.cancel(true);
+                    call.reject("Connection timed out after 150 seconds. Check your internet or office Wi-Fi restrictions, then try again.");
+                    return;
+                }
                 if (response != null && response.isSuccess()) {
                     JSObject result = new JSObject();
                     result.put("success", true);
