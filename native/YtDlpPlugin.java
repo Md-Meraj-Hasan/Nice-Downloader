@@ -1,6 +1,7 @@
 package __PACKAGE__;
 
 import android.net.Uri;
+import android.provider.OpenableColumns;
 import android.content.Intent;
 import android.app.Activity;
 import androidx.activity.result.ActivityResult;
@@ -63,12 +64,20 @@ public class YtDlpPlugin extends Plugin {
     @ActivityCallback
     private void cookiesFilePicked(PluginCall call, ActivityResult result) {
         if (call == null) return;
-        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null || result.getData().getData() == null) {
+        if (result == null || result.getResultCode() != Activity.RESULT_OK || result.getData() == null || result.getData().getData() == null) {
             call.reject("No cookies file selected."); return;
         }
-        try (InputStream input = getContext().getContentResolver().openInputStream(result.getData().getData());
+        Uri selectedUri = result.getData().getData();
+        String selectedName = "cookies.txt";
+        try (android.database.Cursor cursor = getContext().getContentResolver().query(selectedUri, null, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (nameIndex >= 0) selectedName = cursor.getString(nameIndex);
+            }
+        } catch (Exception ignored) { }
+        try (InputStream input = getContext().getContentResolver().openInputStream(selectedUri);
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            if (input == null) throw new Exception("Cannot read selected file.");
+            if (input == null) throw new Exception("Android could not open the selected file. Copy it to Downloads and try again.");
             byte[] buffer = new byte[8192]; int read; int total = 0;
             while ((read = input.read(buffer)) != -1) {
                 total += read; if (total > 2 * 1024 * 1024) throw new Exception("Cookies file exceeds 2 MB.");
@@ -82,13 +91,20 @@ public class YtDlpPlugin extends Plugin {
                 String[] fields = line.split("\\t");
                 if (fields.length >= 7) {
                     String domain = fields[0].trim().toLowerCase().replace("#httponly_", "");
-                    if (domain.equals("youtube.com") || domain.endsWith(".youtube.com")) { filtered.append(line).append('\n'); kept++; }
+                    if (domain.equals("youtube.com") || domain.endsWith(".youtube.com") ||
+                        domain.equals("google.com") || domain.endsWith(".google.com")) {
+                        filtered.append(line).append('\n'); kept++;
+                    }
                 }
             }
             if (kept == 0) throw new Exception("No YouTube cookies found. Choose a Netscape-format cookies.txt file.");
             File cookieFile = new File(getContext().getFilesDir(), "youtube-cookies.txt");
             try (FileOutputStream fileOut = new FileOutputStream(cookieFile, false)) { fileOut.write(filtered.toString().getBytes(StandardCharsets.UTF_8)); }
-            JSObject response = new JSObject(); response.put("imported", true); response.put("cookies", kept); call.resolve(response);
+            JSObject response = new JSObject();
+            response.put("imported", true);
+            response.put("cookies", kept);
+            response.put("fileName", selectedName);
+            call.resolve(response);
         } catch (Exception e) { call.reject("Could not import cookies: " + e.getMessage()); }
     }
 
