@@ -2,6 +2,13 @@ package __PACKAGE__;
 
 import android.net.Uri;
 import android.content.Intent;
+import android.app.Activity;
+import androidx.activity.result.ActivityResult;
+import com.getcapacitor.annotation.ActivityCallback;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
 import android.os.Environment;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -44,6 +51,52 @@ public class YtDlpPlugin extends Plugin {
         }
     }
 
+    @PluginMethod
+    public void pickCookies(PluginCall call) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/*");
+        startActivityForResult(call, intent, "cookiesFilePicked");
+    }
+
+    @ActivityCallback
+    private void cookiesFilePicked(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null || result.getData().getData() == null) {
+            call.reject("No cookies file selected."); return;
+        }
+        try (InputStream input = getContext().getContentResolver().openInputStream(result.getData().getData());
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            if (input == null) throw new Exception("Cannot read selected file.");
+            byte[] buffer = new byte[8192]; int read; int total = 0;
+            while ((read = input.read(buffer)) != -1) {
+                total += read; if (total > 2 * 1024 * 1024) throw new Exception("Cookies file exceeds 2 MB.");
+                output.write(buffer, 0, read);
+            }
+            String source = new String(output.toByteArray(), StandardCharsets.UTF_8);
+            StringBuilder filtered = new StringBuilder("# Netscape HTTP Cookie File\n");
+            int kept = 0;
+            for (String line : source.split("\\r?\\n")) {
+                if (line.trim().isEmpty() || line.startsWith("#")) continue;
+                String[] fields = line.split("\\t");
+                if (fields.length >= 7) {
+                    String domain = fields[0].trim().toLowerCase();
+                    if (domain.equals("youtube.com") || domain.endsWith(".youtube.com")) { filtered.append(line).append('\n'); kept++; }
+                }
+            }
+            if (kept == 0) throw new Exception("No YouTube cookies found. Choose a Netscape-format cookies.txt file.");
+            File cookieFile = new File(getContext().getFilesDir(), "youtube-cookies.txt");
+            try (FileOutputStream fileOut = new FileOutputStream(cookieFile, false)) { fileOut.write(filtered.toString().getBytes(StandardCharsets.UTF_8)); }
+            JSObject response = new JSObject(); response.put("imported", true); response.put("cookies", kept); call.resolve(response);
+        } catch (Exception e) { call.reject("Could not import cookies: " + e.getMessage()); }
+    }
+
+    @PluginMethod
+    public void clearCookies(PluginCall call) {
+        File cookieFile = new File(getContext().getFilesDir(), "youtube-cookies.txt");
+        if (!cookieFile.exists() || cookieFile.delete()) call.resolve();
+        else call.reject("Could not remove saved cookies file.");
+    }
     @PluginMethod
     public void download(PluginCall call) {
         String rawUrl = call.getString("url");
@@ -95,6 +148,8 @@ public class YtDlpPlugin extends Plugin {
                         .addOption("--buffer-size", "16K")
                         .addOption("--no-warnings")
                         .addOption("--newline");
+                File cookieFile = new File(getContext().getFilesDir(), "youtube-cookies.txt");
+                if (cookieFile.isFile() && cookieFile.length() > 0) request.addOption("--cookies", cookieFile.getAbsolutePath());
                 JSObject connecting = new JSObject();
                 connecting.put("progress", 0);
                 connecting.put("etaSeconds", 0);
