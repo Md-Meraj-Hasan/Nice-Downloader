@@ -55,7 +55,8 @@ public class YtDlpPlugin extends Plugin {
     public void pickCookies(PluginCall call) {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("text/*");
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"text/plain", "text/*", "application/octet-stream"});
         startActivityForResult(call, intent, "cookiesFilePicked");
     }
 
@@ -77,10 +78,10 @@ public class YtDlpPlugin extends Plugin {
             StringBuilder filtered = new StringBuilder("# Netscape HTTP Cookie File\n");
             int kept = 0;
             for (String line : source.split("\\r?\\n")) {
-                if (line.trim().isEmpty() || line.startsWith("#")) continue;
+                if (line.trim().isEmpty() || (line.startsWith("#") && !line.startsWith("#HttpOnly_"))) continue;
                 String[] fields = line.split("\\t");
                 if (fields.length >= 7) {
-                    String domain = fields[0].trim().toLowerCase();
+                    String domain = fields[0].trim().toLowerCase().replace("#httponly_", "");
                     if (domain.equals("youtube.com") || domain.endsWith(".youtube.com")) { filtered.append(line).append('\n'); kept++; }
                 }
             }
