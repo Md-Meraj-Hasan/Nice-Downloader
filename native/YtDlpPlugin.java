@@ -88,7 +88,10 @@ public class YtDlpPlugin extends Plugin {
                         .addOption("--retries", "10")
                         .addOption("--fragment-retries", "10")
                         .addOption("--file-access-retries", "5")
-                        .addOption("--socket-timeout", "30")
+                        .addOption("--socket-timeout", "60")
+                        // Prefer IPv4 on networks where IPv6 routing or TLS paths are unstable.
+                        .addOption("--force-ipv4")
+                        .addOption("--extractor-retries", "5")
                         .addOption("--buffer-size", "16K")
                         .addOption("--no-warnings")
                         .addOption("--newline");
