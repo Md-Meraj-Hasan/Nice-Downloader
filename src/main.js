@@ -185,8 +185,8 @@ button.addEventListener("click", async () => {
   progressWrap.hidden = false;
   progressBar.style.width = "0%";
   progressValue.textContent = "0%";
-  progressLabel.textContent = "Connecting to source…";
-  status.textContent = "Downloading on this device. Keep the app available.";
+  progressLabel.textContent = "Preparing downloader…";
+  status.textContent = "Preparing connection. If the source does not respond, the app will show a timeout.";
   downloadSessions += 1;
   updateDownloadSummary("Active");
   downloadState.innerHTML = '<div class="manager-status active-status"><span class="pulse-dot"></span> ACTIVE DOWNLOAD</div><div class="manager-file-icon">${icon("video")}</div><b>Download in progress</b><small>' + escapeText(url.hostname) + '</small><div class="manager-progress"><span id="managerProgressBar"></span></div><small id="managerProgressText">Connecting to source…</small>';
@@ -196,7 +196,7 @@ button.addEventListener("click", async () => {
         const pct = Math.max(0, Math.min(100, Number(event.progress) || 0));
         progressBar.style.width = pct + "%";
         progressValue.textContent = Math.round(pct) + "%";
-        progressLabel.textContent = event.etaSeconds > 0 ? "Downloading · ETA " + event.etaSeconds + "s" : "Downloading…";
+        progressLabel.textContent = event.progress > 0 ? (event.etaSeconds > 0 ? "Downloading · ETA " + event.etaSeconds + "s" : "Downloading…") : (event.message || "Connecting to source…");
         const managerBar = $("#managerProgressBar"), managerText = $("#managerProgressText");
         if (managerBar) managerBar.style.width = pct + "%";
         if (managerText) managerText.textContent = Math.round(pct) + "% completed";
@@ -212,7 +212,7 @@ button.addEventListener("click", async () => {
   } catch (error) {
     const message = error?.message || String(error);
     status.textContent = "Download failed: " + message;
-    progressLabel.textContent = "Download failed";
+    progressLabel.textContent = message.toLowerCase().includes("timed out") ? "Connection timed out" : "Download failed";
     updateDownloadSummary("Failed");
     downloadState.innerHTML = '<div class="manager-status failed-status">DOWNLOAD FAILED</div><div class="manager-file-icon failed-file">!</div><b>Could not complete download</b><small>' + escapeText(message) + '</small>';
     browserBtn.hidden = false;
