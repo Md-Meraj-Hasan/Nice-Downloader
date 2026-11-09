@@ -163,7 +163,9 @@ public class YtDlpPlugin extends Plugin {
                         .addOption("--force-ipv4")
                         .addOption("--extractor-retries", "5")
                         .addOption("--buffer-size", "16K")
-                        .addOption("--no-warnings")
+                        // Prefer YouTube's Android player client on Android devices. This is a free
+                        // compatibility fallback; it does not disable TLS certificate checks.
+                        .addOption("--extractor-args", "youtube:player_client=android")
                         .addOption("--newline");
                 File cookieFile = new File(getContext().getFilesDir(), "youtube-cookies.txt");
                 if (cookieFile.isFile() && cookieFile.length() > 0) request.addOption("--cookies", cookieFile.getAbsolutePath());
