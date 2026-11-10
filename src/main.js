@@ -3,7 +3,7 @@ import { registerPlugin, Capacitor } from "@capacitor/core";
 import { Innertube, Platform } from "youtubei.js/web";
 
 Platform.shim.eval = async (data) => new Function(data.output)();
-let youtubeClientPromise;
+const youtubeClients = new Map();
 
 const YtDlp = registerPlugin("YtDlp");
 
@@ -33,6 +33,18 @@ async function youtubeNativeFetch(input, init = {}) {
     status: Number(result.status) || 200,
     headers: result.headers || {}
   });
+}
+
+async function getYouTubeClient(clientType) {
+  if (!youtubeClients.has(clientType)) {
+    youtubeClients.set(clientType, Innertube.create({
+      client_type: clientType,
+      retrieve_player: true,
+      enable_session_cache: false,
+      fetch: youtubeNativeFetch
+    }));
+  }
+  return youtubeClients.get(clientType);
 }
 
 // YouTube.js otherwise uses WebView fetch directly. Native HTTPS avoids WebView
@@ -151,50 +163,75 @@ function extractYouTubeVideoId(value) {
 async function readYouTubeDetails(videoUrl) {
   const videoId = extractYouTubeVideoId(videoUrl);
   if (!videoId) throw new Error("Unsupported YouTube video link.");
-  try {
-    youtubeClientPromise ||= Innertube.create({
-      client_type: "WEB",
-      retrieve_player: true,
-      enable_session_cache: true,
-      fetch: youtubeNativeFetch
-    });
-    const youtube = await youtubeClientPromise;
-    const info = await youtube.getBasicInfo(videoId);
-    const rawFormats = info.streaming_data?.formats || [];
-    const formats = [];
-    let decipherFailures = 0;
-    for (const format of rawFormats) {
-      if (!format.has_video || !format.has_audio || !String(format.mime_type || "").toLowerCase().includes("video/mp4")) continue;
-      let streamUrl = "";
-      try { streamUrl = format.url || await format.decipher(youtube.session.player); } catch { decipherFailures += 1; continue; }
-      if (!streamUrl || !streamUrl.startsWith("https://")) continue;
-      formats.push({
-        url: streamUrl,
-        height: Number(format.height) || 0,
-        ext: "mp4",
-        filesize: Number(format.content_length) || 0,
-        hasVideo: true,
-        hasAudio: true,
-        mimeType: "video/mp4",
-        quality: format.quality_label || (format.height ? format.height + "p" : "MP4")
-      });
+
+  const clientAttempts = ["ANDROID", "iOS", "WEB"];
+  let lastError = null;
+  let bestInfo = null;
+  let bestFormats = [];
+  let totalDecipherFailures = 0;
+
+  for (const clientType of clientAttempts) {
+    try {
+      const youtube = await getYouTubeClient(clientType);
+      const info = await youtube.getBasicInfo(videoId);
+      const rawFormats = info.streaming_data?.formats || [];
+      const formats = [];
+      let decipherFailures = 0;
+
+      for (const format of rawFormats) {
+        const mimeType = String(format.mime_type || "").toLowerCase();
+        if (!format.has_video || !format.has_audio || !mimeType.includes("video/mp4")) continue;
+        let streamUrl = "";
+        try {
+          streamUrl = format.url || await format.decipher(youtube.session.player);
+        } catch {
+          decipherFailures += 1;
+          continue;
+        }
+        if (!streamUrl || !streamUrl.startsWith("https://")) continue;
+        formats.push({
+          url: streamUrl,
+          height: Number(format.height) || 0,
+          ext: "mp4",
+          filesize: Number(format.content_length) || 0,
+          hasVideo: true,
+          hasAudio: true,
+          mimeType: "video/mp4",
+          quality: format.quality_label || (format.height ? format.height + "p" : "MP4"),
+          sourceClient: clientType
+        });
+      }
+
+      formats.sort((a, b) => b.height - a.height);
+      if (formats.length > bestFormats.length) {
+        bestFormats = formats;
+        bestInfo = { info, youtube, clientType };
+      }
+      totalDecipherFailures += decipherFailures;
+      if (formats.length) break;
+    } catch (error) {
+      lastError = error;
     }
-    formats.sort((a, b) => b.height - a.height);
-    const basic = info.basic_info || {};
-    const thumbnails = basic.thumbnail || [];
-    return {
-      videoId,
-      title: basic.title || "YouTube video",
-      uploader: basic.author || "",
-      thumbnail: thumbnails.length ? thumbnails[thumbnails.length - 1].url : "",
-      duration: Number(basic.duration) || 0,
-      formats,
-      decipherFailures,
-      downloadable: formats.length > 0
-    };
-  } catch (error) {
-    throw new Error("YouTube stream extraction failed: " + (error?.message || "network or video unavailable"));
   }
+
+  if (!bestInfo) {
+    if (lastError) throw new Error("YouTube stream extraction failed: " + (lastError.message || "network or video unavailable"));
+    throw new Error("YouTube returned no playable MP4 stream for this video.");
+  }
+
+  const basic = bestInfo.info.basic_info || {};
+  const thumbnails = basic.thumbnail || [];
+  return {
+    videoId,
+    title: basic.title || "YouTube video",
+    uploader: basic.author || "",
+    thumbnail: thumbnails.length ? thumbnails[thumbnails.length - 1].url : "",
+    duration: Number(basic.duration) || 0,
+    formats: bestFormats,
+    decipherFailures: totalDecipherFailures,
+    sourceClient: bestInfo.clientType,
+    downloadable: bestFormats.length > 0
+  };
 }
 
 function switchTab(tab) {
