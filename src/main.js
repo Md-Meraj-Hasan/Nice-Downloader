@@ -30,7 +30,7 @@ app.innerHTML = `
   <main class="stage">
     <section class="page active" id="page-home">
       <div class="hero-banner">
-        <div class="hero-copy"><div class="eyebrow"><span class="eyebrow-dot"></span> ALL MEDIA DOWNLOADER</div><h1>Your media.<br><span>Your way.</span></h1><p>Download videos and audio in your preferred quality</p></div>
+        <div class="hero-copy"><div class="eyebrow"><span class="eyebrow-dot"></span> YOUTUBE VIDEO DOWNLOADER</div><h1>Your media.<br><span>Your way.</span></h1><p>Download YouTube videos and audio in your preferred quality</p></div>
         <div class="hero-art"><div class="hero-ring"></div><div class="hero-download">${icon("download")}</div><div class="hero-play">▶</div></div>
         <div class="hero-glow"></div>
       </div>
@@ -38,7 +38,7 @@ app.innerHTML = `
       <div class="section-heading"><div><span class="section-kicker">GET STARTED</span><h2>New download</h2></div><span class="secure-chip">${icon("shield")} On-device</span></div>
       <div class="download-card">
         <label for="urlInput">PASTE YOUR MEDIA LINK</label>
-        <div class="urlbox"><span class="url-icon">${icon("link")}</span><input id="urlInput" type="url" placeholder="Paste video or audio link here…" autocomplete="url"><button id="pasteBtn" class="paste-btn" aria-label="Paste from clipboard">${icon("paste")}</button></div>
+        <div class="urlbox"><span class="url-icon">${icon("link")}</span><input id="urlInput" type="url" placeholder="Paste YouTube video link here…" autocomplete="url"><button id="pasteBtn" class="paste-btn" aria-label="Paste from clipboard">${icon("paste")}</button></div>
         <select id="quality" hidden><option value="best">Best</option><option value="audio">Audio</option></select>
         <div class="cookie-tools"><button id="importCookiesBtn" class="cookie-btn">Import YouTube cookies.txt</button><button id="clearCookiesBtn" class="cookie-clear">Clear</button></div><p id="cookieStatus" class="cookie-status">Optional: import your own YouTube cookies file if a signed-in session is required.</p>
         <button id="downloadBtn" class="primary"><span class="primary-icon">${icon("download")}</span> Download now <span class="button-arrow">→</span></button>
@@ -85,8 +85,13 @@ function switchTab(tab) {
   document.querySelectorAll("[data-tab]").forEach(item => item.classList.toggle("active", item.dataset.tab === tab));
 }
 function validWebUrl(value) {
-  try { const url = new URL(value.trim()); return ["http:", "https:"].includes(url.protocol) && url.hostname ? url : null; }
-  catch { return null; }
+  try {
+    const url = new URL(value.trim());
+    const host = url.hostname.toLowerCase().replace(/^www\\./, "");
+    const isYouTube = host === "youtube.com" || host.endsWith(".youtube.com") ||
+      host === "youtu.be" || host.endsWith(".youtu.be");
+    return ["http:", "https:"].includes(url.protocol) && isYouTube ? url : null;
+  } catch { return null; }
 }
 function escapeText(value) {
   return String(value).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
@@ -127,7 +132,7 @@ $("#pasteBtn").addEventListener("click", async () => {
 
 async function startSelectedDownload() {
   const url = validWebUrl(input.value);
-  if (!url) { status.textContent = "Please enter a valid http or https link."; input.focus(); return; }
+  if (!url) { status.textContent = "Please enter a valid YouTube video link."; input.focus(); return; }
   if (!Capacitor.isNativePlatform()) { status.textContent = "Native downloading is available in the Android APK."; return; }
   button.disabled = true;
   button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Starting…';
@@ -210,7 +215,7 @@ function showFormatChoices(info) {
 }
 button.addEventListener("click", async () => {
   const url = validWebUrl(input.value);
-  if (!url) { status.textContent = "Please enter a valid http or https link."; input.focus(); return; }
+  if (!url) { status.textContent = "Please enter a valid YouTube video link."; input.focus(); return; }
   if (!Capacitor.isNativePlatform()) { status.textContent = "Format selection is available in the Android APK."; return; }
   button.disabled = true; button.textContent = "Reading video details…";
   status.textContent = "Fetching thumbnail and available formats…";
