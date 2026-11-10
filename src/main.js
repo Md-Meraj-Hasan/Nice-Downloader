@@ -17,6 +17,8 @@ const icon = (name) => {
     speed:'<path d="M3 17a9 9 0 1 1 18 0"/><path d="m12 13 4-4M6 17h12"/>',
     shield:'<path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z"/><path d="m9 12 2 2 4-4"/>',
     check:'<path d="m5 12 4 4L19 6"/>',
+    folder:'<path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    settings:'<circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.6a8 8 0 0 1-1.5.9l-.3 1.8h-2.8l-.3-1.8a8 8 0 0 1-1.5-.9l-1.7.6-1.4-2.4 1.4-1.1a7 7 0 0 1 0-1.8l-1.4-1.1 1.4-2.4 1.7.6a8 8 0 0 1 1.5-.9l.3-1.8h2.8l.3 1.8a8 8 0 0 1 1.5.9l1.7-.6 1.4 2.4-1.4 1.1a7 7 0 0 1 0 1.7z"/>',
   };
   return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+(paths[name]||paths.download)+'</svg>';
 };
@@ -55,6 +57,23 @@ app.innerHTML = `
       <p class="storage-note">${icon("shield")} On Android 10+, completed files appear in Internal Storage / Download / NiceDownloader.</p>
     </section>
 
+    <section class="page settings-page" id="page-settings">
+      <div class="page-heading"><div class="eyebrow"><span class="eyebrow-dot"></span> APP PREFERENCES</div><h2>Settings</h2><p>Manage where your downloads are saved and check storage access.</p></div>
+      <div class="settings-card">
+        <div class="settings-title"><span class="settings-icon">${icon("folder")}</span><div><b>Storage setup</b><small>Download folder and permission</small></div><span id="storageBadge" class="settings-badge">Checking…</span></div>
+        <div class="storage-location"><small>SAVE LOCATION</small><b id="storageLocation">Download/NiceDownloader</b><p id="storageMethod">Checking Android storage configuration…</p></div>
+        <div class="storage-actions">
+          <button type="button" class="primary settings-action" id="storageSetupBtn">Set up storage access</button>
+          <button type="button" class="settings-secondary" id="openAppSettingsBtn">App permission settings</button>
+        </div>
+        <p class="settings-help" id="storageHelp">Android 10 and newer use the system Downloads provider. Older Android versions may ask for storage permission.</p>
+      </div>
+      <div class="settings-card settings-info">
+        <div class="settings-title"><span class="settings-icon">${icon("shield")}</span><div><b>Privacy & access</b><small>No all-files access required</small></div></div>
+        <p>Nice Downloader saves files in its Download/NiceDownloader folder. It does not need access to all files on your device.</p>
+      </div>
+    </section>
+
   </main>
 
   <div class="format-modal-backdrop" id="formatModal" hidden>
@@ -70,6 +89,7 @@ app.innerHTML = `
   <nav class="bottom-nav" aria-label="Download sections">
     <button class="nav-item active" data-tab="home"><span>${icon("download")}</span><small>Download</small></button>
     <button class="nav-item" data-tab="downloads"><span>${icon("video")}</span><small>Downloads</small></button>
+    <button class="nav-item" data-tab="settings"><span>${icon("settings")}</span><small>Settings</small></button>
   </nav>
 </div>`;
 
@@ -144,6 +164,54 @@ function updateDownloadSummary(label) {
 }
 
 document.querySelectorAll("[data-tab]").forEach(item => item.addEventListener("click", () => switchTab(item.dataset.tab)));
+
+async function refreshStorageSettings() {
+  const badge = $("#storageBadge");
+  const location = $("#storageLocation");
+  const method = $("#storageMethod");
+  const action = $("#storageSetupBtn");
+  if (!Capacitor.isNativePlatform()) {
+    badge.textContent = "Android only";
+    location.textContent = "Download/NiceDownloader";
+    method.textContent = "Install the Android app to configure device storage.";
+    action.disabled = true;
+    return;
+  }
+  try {
+    const state = await YtDlp.getStorageStatus();
+    location.textContent = state.saveLocation || "Download/NiceDownloader";
+    method.textContent = state.method || "Android storage provider";
+    badge.textContent = state.storageReady ? "Ready" : "Permission needed";
+    badge.classList.toggle("ready", Boolean(state.storageReady));
+    action.textContent = state.storageReady ? "Storage is ready" : "Grant storage permission";
+    action.disabled = Boolean(state.storageReady);
+    $("#storageHelp").textContent = state.legacyPermissionRequired
+      ? "Android 9 and below require storage permission to write into the public Downloads folder."
+      : "No storage permission is required on this Android version. Files are saved using Android MediaStore.";
+  } catch (error) {
+    badge.textContent = "Unavailable";
+    method.textContent = error?.message || "Could not read storage status.";
+    action.disabled = false;
+  }
+}
+$("#storageSetupBtn").addEventListener("click", async () => {
+  const action = $("#storageSetupBtn");
+  action.disabled = true;
+  action.textContent = "Checking permission…";
+  try {
+    const result = await YtDlp.requestStoragePermission();
+    $("#storageHelp").textContent = result.message || (result.storageReady ? "Storage is ready." : "Permission was not granted.");
+  } catch (error) {
+    $("#storageHelp").textContent = error?.message || "Could not request storage permission.";
+  } finally {
+    await refreshStorageSettings();
+  }
+});
+$("#openAppSettingsBtn").addEventListener("click", async () => {
+  try { await YtDlp.openAppSettings(); }
+  catch (error) { $("#storageHelp").textContent = error?.message || "Could not open Android app settings."; }
+});
+document.querySelector('[data-tab="settings"]').addEventListener("click", refreshStorageSettings);
 
 
 let formatLookupInProgress = false;
