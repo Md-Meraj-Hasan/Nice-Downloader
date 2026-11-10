@@ -81,7 +81,7 @@ app.innerHTML = `
       <div class="page-heading"><div class="eyebrow"><span class="eyebrow-dot"></span> YOUR LIBRARY</div><h2>Downloads</h2><p>Track the current download and latest result.</p></div>
       <div class="download-stats"><div><span class="stat-icon purple">${icon("download")}</span><b id="downloadCount">0</b><small>Sessions</small></div><div><span class="stat-icon cyan">${icon("speed")}</span><b id="downloadStatus">Ready</b><small>Latest status</small></div></div>
       <div class="download-card manager-card" id="downloadState"><div class="empty-illustration">${icon("download")}</div><b>No downloads yet</b><small>Your download activity will appear here.</small></div>
-      <p class="storage-note">${icon("shield")} Files are saved in the Nice Downloader app folder.</p>
+      <p class="storage-note">${icon("shield")} On Android 10+, completed files appear in Internal Storage / Download / NiceDownloader.</p>
     </section>
 
     <section class="page" id="page-browser">
@@ -228,7 +228,7 @@ button.addEventListener("click", async () => {
     progressBar.style.width = "100%";
     progressValue.textContent = "100%";
     progressLabel.textContent = "Completed";
-    status.textContent = "Download completed. Saved in the NiceDownloader app folder.";
+    status.textContent = result.publicDownload ? "✓ Saved to Internal Storage / Download / NiceDownloader: " + (result.fileName || "video") : "✓ Download completed. App-private file: " + (result.filePath || result.folder || "open app storage");
     updateDownloadSummary("Completed");
     downloadState.innerHTML = '<div class="manager-status complete-status">${icon("check")} COMPLETED</div><div class="manager-file-icon complete-file">${icon("video")}</div><b>Download completed</b><small>' + escapeText(result.folder || "Saved in app Downloads") + '</small>';
   } catch (error) {
