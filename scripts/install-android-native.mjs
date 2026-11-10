@@ -38,9 +38,15 @@ fs.writeFileSync(path.join(javaDir, "YouTubeDownloadPlugin.kt"), plugin);
 
 const manifestPath = "android/app/src/main/AndroidManifest.xml";
 let manifest = fs.readFileSync(manifestPath, "utf8");
-if (!manifest.includes("android.permission.INTERNET")) {
-  manifest = manifest.replace("<application", '    <uses-permission android:name="android.permission.INTERNET" />\n    <application');
+function ensureManifestPermission(permissionXml, permissionName) {
+  if (manifest.includes(`android:name="${permissionName}"`)) return;
+  const applicationTag = manifest.indexOf("<application");
+  if (applicationTag < 0) throw new Error("AndroidManifest application tag not found.");
+  manifest = manifest.slice(0, applicationTag) + "    " + permissionXml + "\n    " + manifest.slice(applicationTag);
 }
+ensureManifestPermission('<uses-permission android:name="android.permission.INTERNET" />', "android.permission.INTERNET");
+// Legacy file-path writes are used only on Android 9 and below. Android 10+ uses MediaStore.
+ensureManifestPermission('<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />', "android.permission.WRITE_EXTERNAL_STORAGE");
 fs.writeFileSync(manifestPath, manifest);
 
 const javaMain = path.join(javaDir, "MainActivity.java");
