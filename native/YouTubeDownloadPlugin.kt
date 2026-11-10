@@ -1,5 +1,6 @@
 package __PACKAGE__
 
+import android.Manifest
 import android.content.ContentValues
 import android.net.Uri
 import android.os.Build
@@ -9,7 +10,10 @@ import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
+import com.getcapacitor.PermissionState
 import com.getcapacitor.annotation.CapacitorPlugin
+import com.getcapacitor.annotation.Permission
+import com.getcapacitor.annotation.PermissionCallback
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.net.HttpURLConnection
@@ -17,10 +21,32 @@ import java.net.URL
 import java.util.Locale
 import kotlin.concurrent.thread
 
-@CapacitorPlugin(name = "YtDlp")
+@CapacitorPlugin(
+    name = "YtDlp",
+    permissions = [Permission(alias = "storage", strings = [Manifest.permission.WRITE_EXTERNAL_STORAGE])]
+)
 class YouTubeDownloadPlugin : Plugin() {
     @PluginMethod
     fun downloadStream(call: PluginCall) {
+        // Android 10+ uses MediaStore/scoped storage; request no broad storage permission there.
+        // Android 9 and older need the legacy WRITE_EXTERNAL_STORAGE runtime permission.
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P && getPermissionState("storage") != PermissionState.GRANTED) {
+            requestPermissionForAlias("storage", call, "storagePermissionCallback")
+            return
+        }
+        startDownload(call)
+    }
+
+    @PermissionCallback
+    private fun storagePermissionCallback(call: PluginCall) {
+        if (getPermissionState("storage") == PermissionState.GRANTED) {
+            startDownload(call)
+        } else {
+            call.reject("Storage permission was denied. Allow storage access to save downloads.")
+        }
+    }
+
+    private fun startDownload(call: PluginCall) {
         val raw = call.getString("streamUrl")?.trim().orEmpty()
         val title = call.getString("title")?.trim().orEmpty().ifBlank { "YouTube video" }
         val extension = call.getString("extension")?.lowercase(Locale.ROOT)?.takeIf { it.matches(Regex("[a-z0-9]{2,5}")) } ?: "mp4"
