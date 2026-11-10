@@ -3,6 +3,8 @@ package __PACKAGE__
 import android.Manifest
 import android.content.ContentValues
 import android.net.Uri
+import android.content.Intent
+import android.provider.Settings
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -26,6 +28,59 @@ import kotlin.concurrent.thread
     permissions = [Permission(alias = "storage", strings = [Manifest.permission.WRITE_EXTERNAL_STORAGE])]
 )
 class YouTubeDownloadPlugin : Plugin() {
+    @PluginMethod
+    fun getStorageStatus(call: PluginCall) {
+        val legacy = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P
+        val granted = !legacy || getPermissionState("storage") == PermissionState.GRANTED
+        call.resolve(JSObject().apply {
+            put("apiLevel", Build.VERSION.SDK_INT)
+            put("legacyPermissionRequired", legacy)
+            put("permissionGranted", granted)
+            put("storageReady", granted)
+            put("saveLocation", "Download/NiceDownloader")
+            put("method", if (legacy) "Legacy storage permission" else "Android MediaStore (no broad storage permission)")
+        })
+    }
+
+    @PluginMethod
+    fun requestStoragePermission(call: PluginCall) {
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+            call.resolve(JSObject().apply {
+                put("storageReady", true)
+                put("permissionGranted", true)
+                put("message", "Android manages Downloads access through MediaStore. No storage permission is needed.")
+            })
+            return
+        }
+        if (getPermissionState("storage") == PermissionState.GRANTED) {
+            call.resolve(JSObject().apply { put("storageReady", true); put("permissionGranted", true) })
+        } else {
+            requestPermissionForAlias("storage", call, "settingsStoragePermissionCallback")
+        }
+    }
+
+    @PermissionCallback
+    private fun settingsStoragePermissionCallback(call: PluginCall) {
+        val granted = getPermissionState("storage") == PermissionState.GRANTED
+        call.resolve(JSObject().apply {
+            put("storageReady", granted)
+            put("permissionGranted", granted)
+            put("message", if (granted) "Storage permission granted." else "Storage permission was not granted.")
+        })
+    }
+
+    @PluginMethod
+    fun openAppSettings(call: PluginCall) {
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getContext().packageName))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            getContext().startActivity(intent)
+            call.resolve()
+        } catch (error: Exception) {
+            call.reject("Could not open app settings: " + (error.message ?: "unknown error"))
+        }
+    }
+
     @PluginMethod
     fun downloadStream(call: PluginCall) {
         // Android 10+ uses MediaStore/scoped storage; request no broad storage permission there.
