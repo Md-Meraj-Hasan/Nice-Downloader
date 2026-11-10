@@ -304,7 +304,7 @@ class YouTubeDownloadPlugin : Plugin() {
             } catch (error: Exception) {
                 destination?.let { runCatching { getContext().contentResolver.delete(it, null, null) } }
                 legacyDestination?.let { runCatching { it.delete() } }
-                call.reject("Download failed: \${error.message ?: "network error"}. Incomplete data is kept privately for retry.")
+                call.reject("Download failed: ${error.message ?: "network error"}. Incomplete data is kept privately for retry.")
             } finally {
                 connection?.disconnect()
             }
