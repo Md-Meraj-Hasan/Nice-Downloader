@@ -24,6 +24,9 @@ class YouTubeDownloadPlugin : Plugin() {
         val raw = call.getString("streamUrl")?.trim().orEmpty()
         val title = call.getString("title")?.trim().orEmpty().ifBlank { "YouTube video" }
         val extension = call.getString("extension")?.lowercase(Locale.ROOT)?.takeIf { it.matches(Regex("[a-z0-9]{2,5}")) } ?: "mp4"
+        val requestedMime = call.getString("mimeType")?.substringBefore(";")?.trim()?.lowercase(Locale.ROOT)
+        val mimeType = requestedMime?.takeIf { it in setOf("video/mp4", "video/webm", "audio/mp4", "audio/webm") }
+            ?: if (extension == "m4a") "audio/mp4" else if (extension == "webm") "video/webm" else "video/mp4"
         val uri = runCatching { Uri.parse(raw) }.getOrNull()
         if (uri == null || uri.scheme != "https" || uri.host?.lowercase(Locale.ROOT)?.endsWith(".googlevideo.com") != true) {
             call.reject("Invalid YouTube media stream URL.")
@@ -45,7 +48,7 @@ class YouTubeDownloadPlugin : Plugin() {
                 val safeName = title.replace(Regex("[\\\\/:*?\"<>|\\r\\n]"), "_").trim().take(100).ifBlank { "YouTube video" } + "." + extension
                 val values = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
-                    put(MediaStore.MediaColumns.MIME_TYPE, if (extension == "webm") "video/webm" else if (extension == "m4a") "audio/mp4" else "video/mp4")
+                    put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/NiceDownloader")
                         put(MediaStore.MediaColumns.IS_PENDING, 1)
