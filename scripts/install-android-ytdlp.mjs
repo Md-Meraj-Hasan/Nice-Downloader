@@ -22,11 +22,27 @@ const javaDir = path.join("android/app/src/main/java", ...namespace.split("."));
 fs.mkdirSync(javaDir, { recursive: true });
 const pluginSource = fs.readFileSync("native/YtDlpPlugin.java", "utf8").replace("__PACKAGE__", namespace);
 fs.writeFileSync(path.join(javaDir, "YtDlpPlugin.java"), pluginSource);
+const serviceSource = fs.readFileSync("native/DownloadForegroundService.java", "utf8").replace("__PACKAGE__", namespace);
+fs.writeFileSync(path.join(javaDir, "DownloadForegroundService.java"), serviceSource);
 const manifestPath = "android/app/src/main/AndroidManifest.xml";
 let manifest = fs.readFileSync(manifestPath, "utf8");
+const permissions = [
+  '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />',
+  '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />',
+  '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />'
+];
+for (const permission of permissions) {
+  const name = permission.match(/android:name="([^"]+)"/)[1];
+  if (!manifest.includes(name)) manifest = manifest.replace("<application", permission + "\\n    <application");
+}
+if (!manifest.includes("DownloadForegroundService")) {
+  manifest = manifest.replace("</application>", '        <service android:name="' + namespace + '.DownloadForegroundService" android:exported="false" android:foregroundServiceType="dataSync" />\\n    </application>');
+}
 if (!manifest.includes('android.permission.INTERNET')) {
   manifest = manifest.replace("<manifest", '<manifest');
   manifest = manifest.replace(/<application/, '    <uses-permission android:name="android.permission.INTERNET" />\n    <application');
+  fs.writeFileSync(manifestPath, manifest);
+} else {
   fs.writeFileSync(manifestPath, manifest);
 }
 const javaMain = path.join(javaDir, "MainActivity.java");
