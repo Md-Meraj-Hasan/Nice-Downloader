@@ -17,29 +17,6 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - name: Verify release signing secrets
-        env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          for value in KEYSTORE_B64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
-            if [ -z "${!value}" ]; then
-              echo "::error::Missing GitHub Actions secret: ANDROID_${value#KEYSTORE_}"
-              echo "Add ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD in repository Settings > Secrets and variables > Actions."
-              exit 1
-            fi
-          done
-          KEYSTORE_PATH="$RUNNER_TEMP/nice-downloader-release.jks"
-          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
-          test -s "$KEYSTORE_PATH"
-          echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-          echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "ANDROID_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
-          echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
       - name: Install dependencies
         run: npm install
       - name: Build web app
@@ -50,26 +27,25 @@ jobs:
         run: node scripts/install-android-native.mjs
       - name: Sync Capacitor
         run: npx cap sync android
-      - name: Build single signed release APK
+      - name: Build one installable APK
         working-directory: android
-        run: ./gradlew assembleRelease
-      - name: Audit signed APK
+        run: ./gradlew assembleDebug
+      - name: Audit single APK
         shell: bash
         run: |
           set -euo pipefail
-          apk="android/app/build/outputs/apk/release/app-release.apk"
+          apk="android/app/build/outputs/apk/debug/app-debug.apk"
           test -f "$apk"
           apksigner verify --verbose "$apk"
-          echo "=== Signed release APK ==="
           ls -lh "$apk"
           if unzip -Z1 "$apk" | grep -Eiq '(^|/)(chaquopy|python[0-9.]*|yt.?dlp|ffmpeg)(/|\\.|$)|libpython'; then
             echo "Forbidden Python/yt-dlp/FFmpeg runtime file detected"
             exit 1
           fi
-          echo "Runtime audit passed."
+          echo "Single APK audit passed."
       - name: Upload one installable APK
         uses: actions/upload-artifact@v4
         with:
           name: Nice-Downloader-APK
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
