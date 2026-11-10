@@ -1,5 +1,9 @@
 import "./style.css";
 import { registerPlugin, Capacitor } from "@capacitor/core";
+import { Innertube, Platform } from "youtubei.js/web";
+
+Platform.shim.eval = async (data) => new Function(data.output)();
+let youtubeClientPromise;
 
 const YtDlp = registerPlugin("YtDlp");
 const app = document.querySelector("#app");
@@ -115,34 +119,47 @@ function extractYouTubeVideoId(value) {
 async function readYouTubeDetails(videoUrl) {
   const videoId = extractYouTubeVideoId(videoUrl);
   if (!videoId) throw new Error("Unsupported YouTube video link.");
-  const canonicalUrl = "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId);
-  const endpoint = "https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(canonicalUrl);
-  let response;
-  let data;
   try {
-    // Use the registered Kotlin HTTPS bridge; do not make this request from WebView fetch.
-    response = await YtDlp.httpRequest({
-      url: endpoint,
-      method: "GET",
-      headers: { "Accept": "application/json" },
-      body: ""
+    youtubeClientPromise ||= Innertube.create({
+      client_type: "WEB",
+      retrieve_player: true,
+      enable_session_cache: true
     });
-    data = JSON.parse(response.body || "{}");
+    const youtube = await youtubeClientPromise;
+    const info = await youtube.getInfo(videoId);
+    const rawFormats = info.streaming_data?.formats || [];
+    const formats = [];
+    for (const format of rawFormats) {
+      if (!format.has_video || !format.has_audio || !String(format.mime_type || "").toLowerCase().includes("video/mp4")) continue;
+      let streamUrl = "";
+      try { streamUrl = await format.decipher(youtube.session.player); } catch { continue; }
+      if (!streamUrl || !streamUrl.startsWith("https://")) continue;
+      formats.push({
+        url: streamUrl,
+        height: Number(format.height) || 0,
+        ext: "mp4",
+        filesize: Number(format.content_length) || 0,
+        hasVideo: true,
+        hasAudio: true,
+        mimeType: "video/mp4",
+        quality: format.quality_label || (format.height ? format.height + "p" : "MP4")
+      });
+    }
+    formats.sort((a, b) => b.height - a.height);
+    const basic = info.basic_info || {};
+    const thumbnails = basic.thumbnail || [];
+    return {
+      videoId,
+      title: basic.title || "YouTube video",
+      uploader: basic.author || "",
+      thumbnail: thumbnails.length ? thumbnails[thumbnails.length - 1].url : "",
+      duration: Number(basic.duration) || 0,
+      formats,
+      downloadable: formats.length > 0
+    };
   } catch (error) {
-    throw new Error("Native YouTube request failed: " + (error?.message || "network connection closed"));
+    throw new Error("YouTube stream extraction failed: " + (error?.message || "network or video unavailable"));
   }
-  if (Number(response.status) < 200 || Number(response.status) >= 300) {
-    throw new Error("YouTube oEmbed request failed (HTTP " + response.status + "). The video may be private, unavailable, or unsupported.");
-  }
-  return {
-    videoId,
-    title: data.title || "YouTube video",
-    uploader: data.author_name || "",
-    thumbnail: data.thumbnail_url || "",
-    duration: 0,
-    formats: [],
-    downloadable: false
-  };
 }
 
 function switchTab(tab) {
