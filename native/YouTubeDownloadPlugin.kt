@@ -102,7 +102,10 @@ class YouTubeDownloadPlugin : Plugin() {
                 connection.connectTimeout = 20000
                 connection.readTimeout = 30000
                 connection.instanceFollowRedirects = true
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+                connection.setRequestProperty("Accept", "application/json,text/plain,*/*")
+                connection.setRequestProperty("Accept-Encoding", "identity")
+                connection.setRequestProperty("Connection", "close")
                 val headers = call.getObject("headers")
                 headers?.keys()?.forEach { key ->
                     val value = headers.optString(key)
@@ -129,7 +132,7 @@ class YouTubeDownloadPlugin : Plugin() {
                     put("headers", responseHeaders)
                 })
             } catch (error: Exception) {
-                call.reject("YouTube request failed: ${error.message ?: "network error"}")
+                call.reject("YouTube HTTPS connection failed for " + host + ": " + (error.javaClass.simpleName + ": " + (error.message ?: "network error")))
             } finally {
                 connection?.disconnect()
             }
