@@ -260,7 +260,7 @@ async function previewYouTubeLink(value) {
     const info = await readYouTubeDetails(url.href);
     showFormatChoices(info);
     loadedFormatsForUrl = url.href;
-    status.textContent = "Video details loaded. Official preview does not provide download streams.";
+    status.textContent = info.formats?.length ? "Video details and MP4 qualities loaded." : "Video details loaded, but no compatible MP4 stream is available.";
   } catch (error) {
     loadedFormatsForUrl = "";
     activeFormat = null;
@@ -349,7 +349,7 @@ function showFormatChoices(info) {
   $("#formatTitle").textContent = activeVideoTitle;
   const duration = Number(info.duration) || 0;
   $("#formatSubtitle").textContent = (info.uploader ? info.uploader + " · " : "") +
-    (duration ? Math.floor(duration / 60) + ":" + String(Math.floor(duration % 60)).padStart(2, "0") : "YouTube video preview");
+    (duration ? Math.floor(duration / 60) + ":" + String(Math.floor(duration % 60)).padStart(2, "0") : "YouTube video");
   const thumb = $("#formatThumbnail");
   if (info.thumbnail && info.thumbnail.startsWith("https://")) {
     thumb.src = info.thumbnail; thumb.hidden = false; $("#formatThumbnailFallback").hidden = true;
@@ -357,14 +357,31 @@ function showFormatChoices(info) {
   } else { thumb.hidden = true; $("#formatThumbnailFallback").hidden = false; }
   const list = $("#formatOptions");
   list.innerHTML = "";
-  activeFormat = null;
-  selectedFormat = "video";
-  const notice = document.createElement("div");
-  notice.className = "format-unavailable";
-  notice.textContent = "Video details are available, but YouTube oEmbed does not provide a downloadable video stream. No video quality can be selected until an authorized media stream is available.";
-  list.append(notice);
-  $("#formatStart").disabled = true;
-  $("#formatStart").textContent = "Video stream unavailable";
+  const videos = (Array.isArray(info.formats) ? info.formats : [])
+    .filter(f => f.hasVideo && f.hasAudio && f.url && f.mimeType === "video/mp4")
+    .sort((a, b) => b.height - a.height);
+  videos.forEach((item, index) => {
+    const label = document.createElement("label");
+    label.className = "format-choice";
+    const radio = document.createElement("input");
+    radio.type = "radio"; radio.name = "mediaFormat"; radio.value = "video:" + index; radio.checked = index === 0;
+    const detail = document.createElement("span");
+    const size = formatSize(item.filesize);
+    detail.innerHTML = "<b>" + (item.quality || (item.height + "p")) + "</b><small>MP4 · " + (size || "size varies") + " · video + audio</small>";
+    label.append(radio, detail);
+    list.append(label);
+    radio.addEventListener("change", () => { activeFormat = item; selectedFormat = radio.value; });
+  });
+  activeFormat = videos[0] || null;
+  selectedFormat = videos.length ? "video:0" : "";
+  if (!videos.length) {
+    const notice = document.createElement("div");
+    notice.className = "format-unavailable";
+    notice.textContent = "No compatible combined MP4 stream was returned for this video. Try another public video or network.";
+    list.append(notice);
+  }
+  $("#formatStart").disabled = videos.length === 0;
+  $("#formatStart").textContent = videos.length ? "Download MP4 video" : "No MP4 stream available";
   $("#formatModal").hidden = false;
 }
 button.addEventListener("click", async () => {
