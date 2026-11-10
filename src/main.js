@@ -6,6 +6,38 @@ Platform.shim.eval = async (data) => new Function(data.output)();
 let youtubeClientPromise;
 
 const YtDlp = registerPlugin("YtDlp");
+
+async function youtubeNativeFetch(input, init = {}) {
+  if (!Capacitor.isNativePlatform()) return window.fetch(input, init);
+  const request = input instanceof Request ? input : null;
+  const url = request ? request.url : String(input);
+  const method = String(init.method || request?.method || "GET").toUpperCase();
+  const sourceHeaders = new Headers(init.headers || request?.headers || {});
+  const headers = {};
+  sourceHeaders.forEach((value, key) => { headers[key] = value; });
+  let body = init.body;
+  if (body == null && request && method !== "GET" && method !== "HEAD") {
+    try { body = await request.clone().text(); } catch { body = ""; }
+  }
+  if (body != null && typeof body !== "string") {
+    if (body instanceof URLSearchParams) body = body.toString();
+    else if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+      body = new TextDecoder().decode(body instanceof ArrayBuffer ? new Uint8Array(body) : body);
+    } else body = String(body);
+  }
+  const result = await YtDlp.httpRequest({
+    url, method, headers,
+    ...(body != null && method !== "GET" && method !== "HEAD" ? { body } : {})
+  });
+  return new Response(result.body || "", {
+    status: Number(result.status) || 200,
+    headers: result.headers || {}
+  });
+}
+
+// YouTube.js otherwise uses WebView fetch directly. Native HTTPS avoids WebView
+// fetch failures on Android and reuses the app's allow-listed Kotlin network layer.
+Platform.shim.fetch = youtubeNativeFetch;
 const app = document.querySelector("#app");
 
 const icon = (name) => {
