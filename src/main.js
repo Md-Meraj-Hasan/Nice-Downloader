@@ -101,6 +101,16 @@ app.innerHTML = `
     </section>
   </main>
 
+  <div class="format-modal-backdrop" id="formatModal" hidden>
+    <section class="format-modal" role="dialog" aria-modal="true" aria-labelledby="formatTitle">
+      <button type="button" class="format-close" id="formatClose" aria-label="Close">×</button>
+      <div class="format-preview"><img id="formatThumbnail" alt="Video thumbnail" hidden><div id="formatThumbnailFallback">▶</div></div>
+      <div class="format-meta"><h2 id="formatTitle">Choose download format</h2><p id="formatSubtitle">Loading video details…</p></div>
+      <div class="format-options" id="formatOptions"></div>
+      <button type="button" class="primary format-start" id="formatStart" disabled>Download selected format</button>
+      <p class="format-note">Only download content you own or are allowed to save.</p>
+    </section>
+  </div>
   <nav class="bottom-nav" aria-label="Main sections">
     <button class="nav-item active" data-tab="home"><span>${icon("home")}</span><small>Home</small></button>
     <button class="nav-item" data-tab="downloads"><span>${icon("download")}</span><small>Downloads</small></button>
@@ -218,7 +228,7 @@ browserBtn.addEventListener("click", async () => {
   catch (error) { status.textContent = "Could not open browser: " + (error?.message || error); }
 });
 
-button.addEventListener("click", async () => {
+async function startSelectedDownload() {
   const url = validWebUrl(input.value);
   if (!url) { status.textContent = "Please enter a valid http or https link."; input.focus(); return; }
   if (!Capacitor.isNativePlatform()) { status.textContent = "Native downloading is available in the Android APK. Use the Browser tab for web links."; return; }
@@ -262,5 +272,57 @@ button.addEventListener("click", async () => {
   } finally {
     button.disabled = false;
     button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Download now <span class="button-arrow">→</span>';
-  }
+  }}
+
+let selectedFormat = "best";
+function closeFormatModal() { $("#formatModal").hidden = true; }
+$("#formatClose").addEventListener("click", closeFormatModal);
+$("#formatModal").addEventListener("click", event => { if (event.target.id === "formatModal") closeFormatModal(); });
+function formatSize(bytes) {
+  if (!bytes || bytes <= 0) return "";
+  const mb = bytes / 1048576;
+  return mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : mb.toFixed(1) + " MB";
+}
+function showFormatChoices(info) {
+  $("#formatTitle").textContent = info.title || "Choose download format";
+  const duration = Number(info.duration) || 0;
+  $("#formatSubtitle").textContent = (info.uploader ? info.uploader + " · " : "") +
+    (duration ? Math.floor(duration / 60) + ":" + String(Math.floor(duration % 60)).padStart(2, "0") : "Available formats");
+  const thumb = $("#formatThumbnail");
+  if (info.thumbnail && /^https?:\/\//i.test(info.thumbnail)) {
+    thumb.src = info.thumbnail; thumb.hidden = false; $("#formatThumbnailFallback").hidden = true;
+    thumb.onerror = () => { thumb.hidden = true; $("#formatThumbnailFallback").hidden = false; };
+  } else { thumb.hidden = true; $("#formatThumbnailFallback").hidden = false; }
+  const list = $("#formatOptions"); list.innerHTML = "";
+  const formats = Array.isArray(info.formats) ? info.formats : [];
+  const heights = [...new Set(formats.map(f => Number(f.height)).filter(h => h > 0))].sort((a,b) => b-a);
+  heights.forEach((height, index) => {
+    const item = formats.find(f => Number(f.height) === height);
+    const label = document.createElement("label"); label.className = "format-choice";
+    const radio = document.createElement("input"); radio.type = "radio"; radio.name = "mediaFormat"; radio.value = "format:" + item.formatId; radio.checked = index === 0;
+    const detail = document.createElement("span");
+    const size = formatSize(item.filesize);
+    detail.innerHTML = "<b>" + height + "p</b><small>" + String(item.ext || "video").toUpperCase() + (size ? " · " + size : "") + "</small>";
+    label.append(radio, detail); list.append(label);
+  });
+  const audio = document.createElement("label"); audio.className = "format-choice audio-choice";
+  const ar = document.createElement("input"); ar.type = "radio"; ar.name = "mediaFormat"; ar.value = "audio"; ar.checked = heights.length === 0;
+  const ad = document.createElement("span"); ad.innerHTML = "<b>Only Audio</b><small>Best available audio</small>";
+  audio.append(ar, ad); list.append(audio);
+  selectedFormat = list.querySelector('input[name="mediaFormat"]:checked')?.value || "audio";
+  list.querySelectorAll('input[name="mediaFormat"]').forEach(r => r.addEventListener("change", () => selectedFormat = r.value));
+  $("#formatStart").disabled = false; $("#formatModal").hidden = false;
+}
+button.addEventListener("click", async () => {
+  const url = validWebUrl(input.value);
+  if (!url) { status.textContent = "Please enter a valid http or https link."; input.focus(); return; }
+  if (!Capacitor.isNativePlatform()) { status.textContent = "Format selection is available in the Android APK."; return; }
+  button.disabled = true; button.textContent = "Reading video details…";
+  status.textContent = "Fetching thumbnail and available formats…";
+  try { showFormatChoices(await YtDlp.getInfo({url:url.href})); status.textContent = "Choose video quality or audio-only format."; }
+  catch (error) { status.textContent = "Could not read media formats: " + (error?.message || error); }
+  finally { button.disabled = false; button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Download now <span class="button-arrow">→</span>'; }
+});
+$("#formatStart").addEventListener("click", async () => {
+  $("#quality").value = selectedFormat; closeFormatModal(); await startSelectedDownload();
 });
