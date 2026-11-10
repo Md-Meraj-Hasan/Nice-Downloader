@@ -15,12 +15,12 @@ if (!rootGradle.includes("org.jetbrains.kotlin:kotlin-gradle-plugin")) {
   fs.writeFileSync(rootGradlePath, rootGradle);
 }
 // Keep the release APK lean while retaining the Capacitor plugin entry point.
-if (/minifyEnabled\\s+false/.test(appGradle)) appGradle = appGradle.replace(/minifyEnabled\\s+false/, "minifyEnabled true");
-if (/minifyEnabled\\s+true/.test(appGradle) && !/shrinkResources\\s+true/.test(appGradle)) {
-  appGradle = appGradle.replace(/minifyEnabled\\s+true/, "minifyEnabled true\\n            shrinkResources true");
+if (/minifyEnabled\s+false/.test(appGradle)) appGradle = appGradle.replace(/minifyEnabled\s+false/, "minifyEnabled true");
+if (/minifyEnabled\s+true/.test(appGradle) && !/shrinkResources\s+true/.test(appGradle)) {
+  appGradle = appGradle.replace(/minifyEnabled\s+true/, "minifyEnabled true\n            shrinkResources true");
 }
 const proguardPath = "android/app/proguard-rules.pro";
-const proguardRules = "\\n# Capacitor discovers native plugins through their annotations.\\n-keep @com.getcapacitor.annotation.CapacitorPlugin class * { *; }\\n-keep class **.YouTubeDownloadPlugin { *; }\\n";
+const proguardRules = "\n# Capacitor discovers native plugins through their annotations.\n-keep @com.getcapacitor.annotation.CapacitorPlugin class * { *; }\n-keep class **.YouTubeDownloadPlugin { *; }\n";
 fs.appendFileSync(proguardPath, proguardRules);
 fs.writeFileSync(appGradlePath, appGradle);
 
