@@ -14,6 +14,23 @@ if (!rootGradle.includes("org.jetbrains.kotlin:kotlin-gradle-plugin")) {
   rootGradle = rootGradle.replace(/dependencies\s*\{/, match => match + '\n        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21"');
   fs.writeFileSync(rootGradlePath, rootGradle);
 }
+// Configure a single, signed release APK. Secrets are supplied only by GitHub Actions.
+if (!appGradle.includes("signingConfigs")) {
+  const signingBlock = `
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
+            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            keyAlias System.getenv("ANDROID_KEY_ALIAS")
+            keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+        }
+    }
+`;
+  if (!/buildTypes\\s*\\{/.test(appGradle)) throw new Error("Android buildTypes block not found for release signing.");
+  appGradle = appGradle.replace(/buildTypes\\s*\\{/, signingBlock + "    buildTypes {");
+  appGradle = appGradle.replace(/release\\s*\\{/, 'release {\\n            signingConfig signingConfigs.release');
+}
+
 // Keep the release APK lean while retaining the Capacitor plugin entry point.
 if (/minifyEnabled\s+false/.test(appGradle)) appGradle = appGradle.replace(/minifyEnabled\s+false/, "minifyEnabled true");
 if (/minifyEnabled\s+true/.test(appGradle) && !/shrinkResources\s+true/.test(appGradle)) {
