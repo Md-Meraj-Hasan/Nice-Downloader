@@ -195,7 +195,8 @@ public class YtDlpPlugin extends Plugin {
                     .addOption("--extractor-args", "youtube:player_client=android");
                 File cookieFile = new File(getContext().getFilesDir(), "youtube-cookies.txt");
                 if (cookieFile.isFile() && cookieFile.length() > 0) request.addOption("--cookies", cookieFile.getAbsolutePath());
-                YtDlpResponse response = YtDlp.execute(request);
+                Future<YtDlpResponse> infoFuture = YtDlp.executeAsync(request, (progress, eta, line) -> { });
+                YtDlpResponse response = infoFuture.get(90, TimeUnit.SECONDS);
                 if (response == null || !response.isSuccess()) {
                     String error = response == null ? "No response from media extractor." : response.getErrorOutput();
                     throw new Exception(error == null || error.isEmpty() ? "Could not read video details." : error);
