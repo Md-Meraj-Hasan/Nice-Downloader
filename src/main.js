@@ -25,14 +25,14 @@ const icon = (name) => {
 app.innerHTML = `
 <div class="app-shell">
   <header class="topbar">
-    <div class="brand"><div class="brand-mark"><span></span></div><div class="brand-copy"><b>Nice Downloader</b><small>VIDEO · AUDIO DOWNLOADER</small></div></div>
+    <div class="brand"><div class="brand-mark"><span></span></div><div class="brand-copy"><b>Nice Downloader</b><small>VIDEO DOWNLOADER</small></div></div>
   </header>
 
 
   <main class="stage">
     <section class="page active" id="page-home">
       <div class="hero-banner">
-        <div class="hero-copy"><div class="eyebrow"><span class="eyebrow-dot"></span> YOUTUBE VIDEO DOWNLOADER</div><h1>Your media.<br><span>Your way.</span></h1><p>Download YouTube videos and audio in your preferred quality</p></div>
+        <div class="hero-copy"><div class="eyebrow"><span class="eyebrow-dot"></span> YOUTUBE VIDEO DOWNLOADER</div><h1>Your media.<br><span>Your way.</span></h1><p>Download supported videos in your preferred quality</p></div>
         <div class="hero-art"><div class="hero-ring"></div><div class="hero-download">${icon("download")}</div><div class="hero-play">▶</div></div>
         <div class="hero-glow"></div>
       </div>
@@ -338,30 +338,16 @@ function showFormatChoices(info) {
     thumb.src = info.thumbnail; thumb.hidden = false; $("#formatThumbnailFallback").hidden = true;
     thumb.onerror = () => { thumb.hidden = true; $("#formatThumbnailFallback").hidden = false; };
   } else { thumb.hidden = true; $("#formatThumbnailFallback").hidden = false; }
-  const list = $("#formatOptions"); list.innerHTML = "";
-  const formats = [];
-  const videos = formats.filter(f => f.hasVideo).sort((a,b) => b.height-a.height);
-  videos.forEach((item, index) => {
-    const label = document.createElement("label"); label.className = "format-choice";
-    const radio = document.createElement("input"); radio.type = "radio"; radio.name = "mediaFormat"; radio.value = "video:" + index; radio.checked = index === 0;
-    const detail = document.createElement("span");
-    const size = formatSize(item.filesize);
-    detail.innerHTML = "<b>" + item.height + "p</b><small>" + String(item.ext || "video").toUpperCase() + (size ? " · " + size : "") + " · audio included</small>";
-    label.append(radio, detail); list.append(label);
-    radio.addEventListener("change", () => { activeFormat = item; selectedFormat = radio.value; });
-  });
-  const audio = formats.find(f => !f.hasVideo && f.hasAudio);
-  if (audio) {
-    const label = document.createElement("label"); label.className = "format-choice audio-choice";
-    const radio = document.createElement("input"); radio.type = "radio"; radio.name = "mediaFormat"; radio.value = "audio"; radio.checked = videos.length === 0;
-    const detail = document.createElement("span"); detail.innerHTML = "<b>Audio only</b><small>" + String(audio.ext || "audio").toUpperCase() + "</small>";
-    label.append(radio, detail); list.append(label);
-    radio.addEventListener("change", () => { activeFormat = audio; selectedFormat = "audio"; });
-  }
-  activeFormat = videos[0] || audio || null;
-  selectedFormat = videos.length ? "video:0" : "audio";
+  const list = $("#formatOptions");
+  list.innerHTML = "";
+  activeFormat = null;
+  selectedFormat = "video";
+  const notice = document.createElement("div");
+  notice.className = "format-unavailable";
+  notice.textContent = "Video details are available, but YouTube oEmbed does not provide a downloadable video stream. No video quality can be selected until an authorized media stream is available.";
+  list.append(notice);
   $("#formatStart").disabled = true;
-  $("#formatStart").textContent = "Download not provided by oEmbed";
+  $("#formatStart").textContent = "Video stream unavailable";
   $("#formatModal").hidden = false;
 }
 button.addEventListener("click", async () => {
