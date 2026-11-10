@@ -1,39 +1,31 @@
 # Nice Downloader
 
-A private, ad-free Android media downloader.
+A focused, ad-free Android video and audio downloader.
 
-## Product guarantees
-- Zero ads: no AdMob, banners, interstitials, rewarded ads, advertising SDKs, or promotional notifications.
-- No mandatory account and no cloud download server.
-- No advertising redirects or forced landing pages.
-- No DRM, paywall, or access-control bypass. Download only media you own, have permission to save, or that the source platform expressly permits.
+## Only required components
+- JavaScript + Vite: build the lightweight downloader interface.
+- Capacitor Android/Core: Android application shell and native bridge.
+- yt-dlp Android runtime: read supported media formats and download selected streams.
+- FFmpeg support supplied by the downloader runtime/dependency graph when required to merge separate video and audio streams.
+- GitHub Actions: build and publish the debug APK artifact.
 
-## Technology
-- Vite + JavaScript interface
-- Capacitor 7 Android shell
-- On-device yt-dlp Android library (MIT wrapper; yt-dlp and bundled components retain their own notices)
-- GitHub Actions debug APK build
+No analytics, advertising SDKs, browser-launch helper, cookie-import UI, login manager, playlist manager, media player, file manager, or unrelated utility libraries are included.
 
-## Current implementation
-- Premium dark / light theme toggle
-- URL validation and quality preset selector
-- Native on-device yt-dlp download bridge
-- Live progress events and completion/failure status
-- Optional import of a Netscape-format YouTube cookies.txt file; only YouTube-domain cookies are retained in private app storage, with a clear option
-- Faster HLS/DASH downloads using 8 concurrent fragments, with retries, socket timeout, and a larger I/O buffer
-- Output is currently stored in the app-specific external Downloads/NiceDownloader folder. A later storage milestone will add a user-selected public Downloads folder and download history.
+## Download features
+- Paste a supported HTTP/HTTPS media URL.
+- Read available resolutions and formats from the source.
+- Select the source-provided video resolution, including 4K when available.
+- Download audio-only when the source provides an audio stream.
+- Merge compatible video and audio streams when required by the selected format and bundled runtime.
+- Show download progress and completion/failure status.
+- Save completed files to Internal Storage / Download / NiceDownloader on Android 10+.
 
-## Supported quality presets
-- Best available
-- Up to 1080p / 720p / 480p (only if the source provides a compatible format)
-- Audio-only source stream
+## Permissions and limits
+The app uses internet access for media retrieval, Android foreground-service/notification permissions for background downloads, and Android MediaStore to publish completed files to Downloads. It does not bypass DRM, paywalls, or access controls. Download only content you own, are authorized to save, or that the source platform permits.
 
-Speed depends on the source server, selected format, device, and network. Parallel fragments can improve HLS/DASH downloads when the source supports them; ordinary single-stream HTTP downloads may not become faster. The app cannot defeat Wi-Fi firewalls, ISP throttling, server rate limits, or blocked domains, and it does not attempt to bypass network access controls. Use a network and source you are authorized to access. Actual website compatibility changes over time. A platform may require an authorized session, may block a particular Android runtime, or may prohibit downloads. The free yt-dlp Android runtime does not include browser TLS impersonation; some sites may therefore fail. Optional YouTube cookies may help when an authorized session is required, but cookies do not fix network TLS disconnects or impersonate Chrome. No guarantee is made that every link or every resolution works.
+The available resolutions and formats depend on the source. The app cannot create a resolution that the source does not provide. Runtime compatibility, network restrictions, server limits, and platform changes can affect downloads.
 
-## Device requirements
-The bundled yt-dlp Android runtime currently supports arm64-v8a and x86_64. It does not support 32-bit-only ARM devices. The embedded runtime increases APK size substantially (roughly 60–80 MB before other app content).
-
-## Local build
+## Build
 ```bash
 npm install
 npm run build
@@ -43,8 +35,4 @@ npx cap sync android
 cd android && ./gradlew assembleDebug
 ```
 
-## GitHub Actions
-Every push to `main` or manual workflow dispatch builds a debug APK and uploads it as `Nice-Downloader-debug-apk`.
-
-## Ad-free dependency policy
-Do not add ad networks, advertising SDKs, analytics trackers, or promotional notification services. Review new dependencies and their transitive dependencies before merging.
+GitHub Actions builds a debug APK on pushes to `main` and on manual workflow dispatch.
