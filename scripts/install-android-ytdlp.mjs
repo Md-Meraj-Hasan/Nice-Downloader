@@ -37,7 +37,7 @@ if (!rootGradle.includes("org.jetbrains.kotlin:kotlin-gradle-plugin")) {
 }
 if (!gradle.includes("kotlin-android")) {
   // Capacitor's generated app module uses the legacy apply-plugin style.
-  gradle = 'apply plugin: "kotlin-android"\\n' + gradle;
+  gradle = 'apply plugin: "kotlin-android"\n' + gradle;
   fs.writeFileSync(gradlePath, gradle);
 }
 const routerSource = fs.readFileSync("native/NativePlatformRouter.kt", "utf8").replace("package __PACKAGE__", "package " + namespace);
