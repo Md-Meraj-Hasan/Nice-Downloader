@@ -120,18 +120,18 @@ async function readYouTubeDetails(videoUrl) {
   let response;
   let data;
   try {
-    response = await fetch(endpoint, {
+    // Use the registered Kotlin HTTPS bridge; do not make this request from WebView fetch.
+    response = await YtDlp.httpRequest({
+      url: endpoint,
       method: "GET",
-      mode: "cors",
-      credentials: "omit",
       headers: { "Accept": "application/json" },
-      cache: "no-store"
+      body: ""
     });
-    data = await response.json();
+    data = JSON.parse(response.body || "{}");
   } catch (error) {
-    throw new Error("YouTube oEmbed connection failed in Android WebView: " + (error?.message || "network connection closed"));
+    throw new Error("Native YouTube request failed: " + (error?.message || "network connection closed"));
   }
-  if (!response.ok) {
+  if (Number(response.status) < 200 || Number(response.status) >= 300) {
     throw new Error("YouTube oEmbed request failed (HTTP " + response.status + "). The video may be private, unavailable, or unsupported.");
   }
   return {
