@@ -1,5 +1,6 @@
 import "./style.css";
 import { registerPlugin, Capacitor } from "@capacitor/core";
+import { Innertube } from "youtubei.js";
 
 const YtDlp = registerPlugin("YtDlp");
 const app = document.querySelector("#app");
@@ -40,7 +41,7 @@ app.innerHTML = `
         <label for="urlInput">PASTE YOUR MEDIA LINK</label>
         <div class="urlbox"><span class="url-icon">${icon("link")}</span><input id="urlInput" type="url" placeholder="Paste YouTube video link here…" autocomplete="url"><button id="pasteBtn" class="paste-btn" aria-label="Paste from clipboard">${icon("paste")}</button></div>
         <select id="quality" hidden><option value="best">Best</option><option value="audio">Audio</option></select>
-        <div class="cookie-tools"><button id="importCookiesBtn" class="cookie-btn">Import YouTube cookies.txt</button><button id="clearCookiesBtn" class="cookie-clear">Clear</button></div><p id="cookieStatus" class="cookie-status">Optional: import your own YouTube cookies file if a signed-in session is required.</p>
+        
         <button id="downloadBtn" class="primary"><span class="primary-icon">${icon("download")}</span> Download now <span class="button-arrow">→</span></button>
         <p class="status" id="status" role="status">Only download content you own or are allowed to save.</p>
         <div class="progress-wrap" id="progressWrap" hidden><div class="progress-head"><span id="progressLabel">Connecting…</span><b id="progressValue">0%</b></div><div class="progress-track"><div id="progressBar"></div></div></div>
@@ -79,6 +80,47 @@ const progressBar = $("#progressBar"), progressValue = $("#progressValue"), prog
 const downloadState = $("#downloadState");
 let progressListener = null;
 let downloadSessions = 0;
+let innertubePromise = null;
+let activeVideoTitle = "YouTube video";
+let activeFormat = null;
+
+async function getYouTubeClient() {
+  if (!innertubePromise) innertubePromise = Innertube.create();
+  return innertubePromise;
+}
+
+async function readYouTubeFormats(videoUrl) {
+  const client = await getYouTubeClient();
+  const info = await client.getInfo(videoUrl);
+  const streaming = info.streaming_data;
+  if (!streaming) throw new Error("YouTube did not provide downloadable public streams for this video.");
+  const candidates = [...(streaming.formats || []), ...(streaming.adaptive_formats || [])];
+  const formats = [];
+  const seen = new Set();
+  for (const item of candidates) {
+    let streamUrl = item.url;
+    if (!streamUrl && typeof item.decipher === "function") {
+      try { streamUrl = await item.decipher(client.session.player); } catch { continue; }
+    }
+    if (!streamUrl || !/^https:\/\//i.test(streamUrl)) continue;
+    let host = ""; try { host = new URL(streamUrl).hostname.toLowerCase(); } catch { continue; }
+    if (!host.endsWith(".googlevideo.com")) continue;
+    const hasVideo = Boolean(item.has_video ?? item.quality_label ?? item.height);
+    const hasAudio = Boolean(item.has_audio);
+    const height = Number(item.height || String(item.quality_label || "").match(/\d+/)?.[0] || 0);
+    if (!hasVideo && !hasAudio) continue;
+    const mime = String(item.mime_type || item.mimeType || "video/mp4");
+    const ext = mime.includes("webm") ? "webm" : mime.includes("audio/mp4") ? "m4a" : "mp4";
+    const key = hasVideo ? "v:" + height + ":" + ext : "a:" + ext;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    formats.push({ formatId: String(item.itag || formats.length), height, ext, filesize: Number(item.content_length || item.contentLength || 0), url: streamUrl, hasVideo, hasAudio });
+  }
+  const video = formats.filter(f => f.hasVideo && f.hasAudio).sort((a,b) => b.height-a.height);
+  const audio = formats.filter(f => !f.hasVideo && f.hasAudio);
+  const title = info.basic_info?.title || info.primary_info?.title?.text || info.title || "YouTube video";
+  return { title, uploader: info.basic_info?.author || "", duration: info.basic_info?.duration || 0, thumbnail: info.basic_info?.thumbnail?.[0]?.url || "", formats: [...video, ...audio] };
+}
 
 function switchTab(tab) {
   document.querySelectorAll(".page").forEach(page => page.classList.toggle("active", page.id === "page-" + tab));
@@ -104,27 +146,6 @@ function updateDownloadSummary(label) {
 document.querySelectorAll("[data-tab]").forEach(item => item.addEventListener("click", () => switchTab(item.dataset.tab)));
 
 
-$("#importCookiesBtn").addEventListener("click", async () => {
-  const cookieStatus = $("#cookieStatus");
-  if (!Capacitor.isNativePlatform()) { cookieStatus.textContent = "Cookie import is available in the installed Android APK."; return; }
-  cookieStatus.textContent = "Opening Android file picker… Choose a Netscape-format cookies.txt file.";
-  $("#importCookiesBtn").disabled = true;
-  try {
-    const result = await YtDlp.pickCookies();
-    if (!result || result.imported !== true) throw new Error("Android did not confirm the cookie import. Please try again.");
-    cookieStatus.textContent = "✓ Imported " + result.cookies + " cookies from " + (result.fileName || "selected file") + ". Saved privately on this device.";
-  } catch (error) {
-    const message = error?.message || error?.error || String(error);
-    cookieStatus.textContent = "Import not completed: " + message;
-  } finally {
-    $("#importCookiesBtn").disabled = false;
-  }
-});
-$("#clearCookiesBtn").addEventListener("click", async () => {
-  if (!Capacitor.isNativePlatform()) return;
-  try { await YtDlp.clearCookies(); $("#cookieStatus").textContent = "Saved YouTube cookies cleared."; }
-  catch (error) { $("#cookieStatus").textContent = error?.message || "Could not clear cookies."; }
-});
 $("#pasteBtn").addEventListener("click", async () => {
   try { input.value = await navigator.clipboard.readText(); status.textContent = input.value ? "Link pasted. Ready to download." : "Clipboard is empty."; }
   catch { status.textContent = "Clipboard unavailable. Paste your link manually."; }
@@ -156,7 +177,8 @@ async function startSelectedDownload() {
         if (managerText) managerText.textContent = Math.round(pct) + "% completed";
       });
     }
-    const result = await YtDlp.download({url:url.href,quality:$("#quality").value});
+    if (!activeFormat?.url) throw new Error("Please select a supported YouTube format first.");
+    const result = await YtDlp.downloadStream({streamUrl:activeFormat.url,title:activeVideoTitle,extension:activeFormat.ext});
     progressBar.style.width = "100%";
     progressValue.textContent = "100%";
     progressLabel.textContent = "Completed";
@@ -184,34 +206,40 @@ function formatSize(bytes) {
   return mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : mb.toFixed(1) + " MB";
 }
 function showFormatChoices(info) {
-  $("#formatTitle").textContent = info.title || "Choose download format";
+  activeVideoTitle = info.title || "YouTube video";
+  $("#formatTitle").textContent = activeVideoTitle;
   const duration = Number(info.duration) || 0;
   $("#formatSubtitle").textContent = (info.uploader ? info.uploader + " · " : "") +
     (duration ? Math.floor(duration / 60) + ":" + String(Math.floor(duration % 60)).padStart(2, "0") : "Available formats");
   const thumb = $("#formatThumbnail");
-  if (info.thumbnail && /^https?:\/\//i.test(info.thumbnail)) {
+  if (info.thumbnail && /^https?:\\/\\//i.test(info.thumbnail)) {
     thumb.src = info.thumbnail; thumb.hidden = false; $("#formatThumbnailFallback").hidden = true;
     thumb.onerror = () => { thumb.hidden = true; $("#formatThumbnailFallback").hidden = false; };
   } else { thumb.hidden = true; $("#formatThumbnailFallback").hidden = false; }
   const list = $("#formatOptions"); list.innerHTML = "";
   const formats = Array.isArray(info.formats) ? info.formats : [];
-  const heights = [...new Set(formats.map(f => Number(f.height)).filter(h => h > 0))].sort((a,b) => b-a);
-  heights.forEach((height, index) => {
-    const item = formats.find(f => Number(f.height) === height);
+  const videos = formats.filter(f => f.hasVideo).sort((a,b) => b.height-a.height);
+  videos.forEach((item, index) => {
     const label = document.createElement("label"); label.className = "format-choice";
-    const radio = document.createElement("input"); radio.type = "radio"; radio.name = "mediaFormat"; radio.value = "format:" + item.formatId; radio.checked = index === 0;
+    const radio = document.createElement("input"); radio.type = "radio"; radio.name = "mediaFormat"; radio.value = "video:" + index; radio.checked = index === 0;
     const detail = document.createElement("span");
     const size = formatSize(item.filesize);
-    detail.innerHTML = "<b>" + height + "p</b><small>" + String(item.ext || "video").toUpperCase() + (size ? " · " + size : "") + "</small>";
+    detail.innerHTML = "<b>" + item.height + "p</b><small>" + String(item.ext || "video").toUpperCase() + (size ? " · " + size : "") + " · audio included</small>";
     label.append(radio, detail); list.append(label);
+    radio.addEventListener("change", () => { activeFormat = item; selectedFormat = radio.value; });
   });
-  const audio = document.createElement("label"); audio.className = "format-choice audio-choice";
-  const ar = document.createElement("input"); ar.type = "radio"; ar.name = "mediaFormat"; ar.value = "audio"; ar.checked = heights.length === 0;
-  const ad = document.createElement("span"); ad.innerHTML = "<b>Only Audio</b><small>Best available audio</small>";
-  audio.append(ar, ad); list.append(audio);
-  selectedFormat = list.querySelector('input[name="mediaFormat"]:checked')?.value || "audio";
-  list.querySelectorAll('input[name="mediaFormat"]').forEach(r => r.addEventListener("change", () => selectedFormat = r.value));
-  $("#formatStart").disabled = false; $("#formatModal").hidden = false;
+  const audio = formats.find(f => !f.hasVideo && f.hasAudio);
+  if (audio) {
+    const label = document.createElement("label"); label.className = "format-choice audio-choice";
+    const radio = document.createElement("input"); radio.type = "radio"; radio.name = "mediaFormat"; radio.value = "audio"; radio.checked = videos.length === 0;
+    const detail = document.createElement("span"); detail.innerHTML = "<b>Audio only</b><small>" + String(audio.ext || "audio").toUpperCase() + "</small>";
+    label.append(radio, detail); list.append(label);
+    radio.addEventListener("change", () => { activeFormat = audio; selectedFormat = "audio"; });
+  }
+  activeFormat = videos[0] || audio || null;
+  selectedFormat = videos.length ? "video:0" : "audio";
+  $("#formatStart").disabled = !activeFormat;
+  $("#formatModal").hidden = false;
 }
 button.addEventListener("click", async () => {
   const url = validWebUrl(input.value);
@@ -219,7 +247,7 @@ button.addEventListener("click", async () => {
   if (!Capacitor.isNativePlatform()) { status.textContent = "Format selection is available in the Android APK."; return; }
   button.disabled = true; button.textContent = "Reading video details…";
   status.textContent = "Fetching thumbnail and available formats…";
-  try { showFormatChoices(await YtDlp.getInfo({url:url.href})); status.textContent = "Choose video quality or audio-only format."; }
+  try { showFormatChoices(await readYouTubeFormats(url.href)); status.textContent = "Choose video quality or audio-only format."; }
   catch (error) { status.textContent = "Could not read media formats: " + (error?.message || error); }
   finally { button.disabled = false; button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Download now'; }
 });
