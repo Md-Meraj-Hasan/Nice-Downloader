@@ -126,7 +126,8 @@ public class YtDlpPlugin extends Plugin {
         File newest = null;
         for (File file : files) {
             if (file.isFile() && !file.getName().endsWith(".part") &&
-                !file.getName().endsWith(".ytdl") && file.lastModified() >= startedAt - 2000 &&
+                !file.getName().endsWith(".ytdl") && !file.getName().endsWith(".temp") &&
+                file.lastModified() >= startedAt - 2000 &&
                 (newest == null || file.lastModified() > newest.lastModified())) {
                 newest = file;
             }
@@ -215,23 +216,32 @@ public class YtDlpPlugin extends Plugin {
                         org.json.JSONObject item = formats.optJSONObject(i);
                         if (item == null) continue;
                         String id = item.optString("format_id", "");
-                        int height = item.optInt("height", 0);
                         String vcodec = item.optString("vcodec", "none");
                         String acodec = item.optString("acodec", "none");
-                        if (id.isEmpty() || height <= 0 || "none".equals(vcodec)) continue;
-                        String key = height + ":" + ("none".equals(acodec) ? "video-only" : "audio-video");
+                        boolean hasVideo = !id.isEmpty() && !"none".equals(vcodec);
+                        boolean hasAudio = !"none".equals(acodec);
+                        if (!hasVideo) continue;
+                        int height = item.optInt("height", 0);
+                        if (height <= 0) continue;
+                        String ext = item.optString("ext", "");
+                        String key = height + ":" + hasAudio + ":" + ext + ":" +
+                            item.optString("vcodec", "") + ":" + item.optString("format_note", "");
                         if (seen.contains(key)) continue;
                         seen.add(key);
                         JSObject choice = new JSObject();
                         choice.put("formatId", id);
                         choice.put("height", height);
-                        choice.put("ext", item.optString("ext", ""));
-                        choice.put("hasAudio", !"none".equals(acodec));
+                        choice.put("ext", ext);
+                        choice.put("hasAudio", hasAudio);
+                        choice.put("vcodec", item.optString("vcodec", ""));
+                        choice.put("fps", item.optDouble("fps", 0));
+                        choice.put("formatNote", item.optString("format_note", ""));
                         choice.put("filesize", item.optLong("filesize", item.optLong("filesize_approx", 0)));
                         choices.put(choice);
                     }
                 }
                 result.put("formats", choices);
+                result.put("audioAvailable", true);
                 call.resolve(result);
             } catch (Exception e) { call.reject("Could not fetch media details: " + e.getMessage()); }
         }, "NiceDownloader-media-info").start();
@@ -254,13 +264,17 @@ public class YtDlpPlugin extends Plugin {
         if (quality.startsWith("format:")) {
             String requestedId = quality.substring(7);
             if (!requestedId.matches("[A-Za-z0-9._+-]+")) { call.reject("Invalid format selection."); return; }
+            // Select the requested video stream and let yt-dlp pair it with the best
+            // compatible audio stream. Audio is never appended to an audio-only choice.
             format = requestedId + "+bestaudio/best";
-        } else switch (quality) {
-            case "1080": format = "best[height<=1080]"; break;
-            case "720": format = "best[height<=720]"; break;
-            case "480": format = "best[height<=480]"; break;
-            case "audio": format = "bestaudio/best"; break;
-            default: format = "best";
+        } else if (quality.startsWith("height:")) {
+            String requestedHeight = quality.substring(7);
+            if (!requestedHeight.matches("[0-9]{2,4}")) { call.reject("Invalid resolution selection."); return; }
+            format = "bestvideo[height=" + requestedHeight + "]+bestaudio/best[height=" + requestedHeight + "]/best[height=" + requestedHeight + "]";
+        } else if ("audio".equals(quality)) {
+            format = "bestaudio/best";
+        } else {
+            format = "bestvideo+bestaudio/best";
         }
 
         Intent foregroundIntent = new Intent(getContext(), DownloadForegroundService.class);
