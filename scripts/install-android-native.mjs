@@ -16,7 +16,7 @@ if (!rootGradle.includes("org.jetbrains.kotlin:kotlin-gradle-plugin")) {
 }
 // Configure a single, signed release APK. Secrets are supplied only by GitHub Actions.
 if (!appGradle.includes("signingConfigs")) {
-  const signingBlock = `
+  const signingBlock = \`
     signingConfigs {
         release {
             storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
@@ -25,9 +25,9 @@ if (!appGradle.includes("signingConfigs")) {
             keyPassword System.getenv("ANDROID_KEY_PASSWORD")
         }
     }
-`;
+\`;
   if (!/buildTypes\s*\{/.test(appGradle)) throw new Error("Android buildTypes block not found for release signing.");
-  appGradle = appGradle.replace(/buildTypes\\s*\\{/, signingBlock + "    buildTypes {");
+  appGradle = appGradle.replace(/buildTypes\s*\{/, signingBlock + "    buildTypes {");
   appGradle = appGradle.replace(/release\s*\{/, 'release {\n            signingConfig signingConfigs.release');
 }
 
