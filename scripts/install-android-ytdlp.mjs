@@ -24,6 +24,24 @@ const pluginSource = fs.readFileSync("native/YtDlpPlugin.java", "utf8").replace(
 fs.writeFileSync(path.join(javaDir, "YtDlpPlugin.java"), pluginSource);
 const serviceSource = fs.readFileSync("native/DownloadForegroundService.java", "utf8").replace("__PACKAGE__", namespace);
 fs.writeFileSync(path.join(javaDir, "DownloadForegroundService.java"), serviceSource);
+
+// Compile the first Kotlin-native migration component in the generated project.
+const rootGradlePath = "android/build.gradle";
+if (!fs.existsSync(rootGradlePath)) throw new Error("Root Android Gradle file not found");
+let rootGradle = fs.readFileSync(rootGradlePath, "utf8");
+if (!rootGradle.includes("org.jetbrains.kotlin:kotlin-gradle-plugin")) {
+  const buildscriptDependencies = /dependencies\s*\{/;
+  if (!buildscriptDependencies.test(rootGradle)) throw new Error("Root Gradle buildscript dependencies block not found");
+  rootGradle = rootGradle.replace(buildscriptDependencies, match => match + '\n        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21"');
+  fs.writeFileSync(rootGradlePath, rootGradle);
+}
+if (!gradle.includes("kotlin-android")) {
+  gradle = gradle.replace(/plugins\s*\{/, match => match + '\n    id "kotlin-android"');
+  if (!gradle.includes("kotlin-android")) throw new Error("App Gradle plugins block not found; cannot enable Kotlin safely");
+  fs.writeFileSync(gradlePath, gradle);
+}
+const routerSource = fs.readFileSync("native/NativePlatformRouter.kt", "utf8").replace("package __PACKAGE__", "package " + namespace);
+fs.writeFileSync(path.join(javaDir, "NativePlatformRouter.kt"), routerSource);
 const manifestPath = "android/app/src/main/AndroidManifest.xml";
 let manifest = fs.readFileSync(manifestPath, "utf8");
 const permissions = [
