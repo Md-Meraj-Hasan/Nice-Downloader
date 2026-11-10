@@ -146,9 +146,60 @@ function updateDownloadSummary(label) {
 document.querySelectorAll("[data-tab]").forEach(item => item.addEventListener("click", () => switchTab(item.dataset.tab)));
 
 
+let formatLookupInProgress = false;
+let loadedFormatsForUrl = "";
+
+async function previewYouTubeLink(value) {
+  const url = validWebUrl(value);
+  if (!url) {
+    status.textContent = "Please paste a valid YouTube video link.";
+    return;
+  }
+  if (!Capacitor.isNativePlatform()) {
+    status.textContent = "Video preview and format selection are available in the Android APK.";
+    return;
+  }
+  if (formatLookupInProgress) return;
+  if (loadedFormatsForUrl === url.href && activeFormat?.url) {
+    $("#formatModal").hidden = false;
+    return;
+  }
+  formatLookupInProgress = true;
+  status.textContent = "Loading video thumbnail and available formats…";
+  button.disabled = true;
+  button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Loading video…';
+  try {
+    const info = await readYouTubeFormats(url.href);
+    showFormatChoices(info);
+    loadedFormatsForUrl = url.href;
+    status.textContent = "Video ready. Choose quality or Audio only.";
+  } catch (error) {
+    loadedFormatsForUrl = "";
+    activeFormat = null;
+    status.textContent = "Could not load video details: " + (error?.message || error);
+  } finally {
+    formatLookupInProgress = false;
+    button.disabled = false;
+    button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Download now';
+  }
+}
+
 $("#pasteBtn").addEventListener("click", async () => {
-  try { input.value = await navigator.clipboard.readText(); status.textContent = input.value ? "Link pasted. Ready to download." : "Clipboard is empty."; }
-  catch { status.textContent = "Clipboard unavailable. Paste your link manually."; }
+  try {
+    input.value = (await navigator.clipboard.readText()).trim();
+    if (!input.value) { status.textContent = "Clipboard is empty."; return; }
+    await previewYouTubeLink(input.value);
+  } catch {
+    status.textContent = "Clipboard unavailable. Paste your link manually.";
+  }
+});
+
+// Automatically preview when a link is pasted into the URL field.
+input.addEventListener("paste", () => {
+  window.setTimeout(() => {
+    input.value = input.value.trim();
+    if (input.value) previewYouTubeLink(input.value);
+  }, 0);
 });
 
 async function startSelectedDownload() {
@@ -244,12 +295,7 @@ function showFormatChoices(info) {
 button.addEventListener("click", async () => {
   const url = validWebUrl(input.value);
   if (!url) { status.textContent = "Please enter a valid YouTube video link."; input.focus(); return; }
-  if (!Capacitor.isNativePlatform()) { status.textContent = "Format selection is available in the Android APK."; return; }
-  button.disabled = true; button.textContent = "Reading video details…";
-  status.textContent = "Fetching thumbnail and available formats…";
-  try { showFormatChoices(await readYouTubeFormats(url.href)); status.textContent = "Choose video quality or audio-only format."; }
-  catch (error) { status.textContent = "Could not read media formats: " + (error?.message || error); }
-  finally { button.disabled = false; button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Download now'; }
+  await previewYouTubeLink(url.href);
 });
 $("#formatStart").addEventListener("click", async () => {
   $("#quality").value = selectedFormat; closeFormatModal(); await startSelectedDownload();
