@@ -6,11 +6,8 @@ const app = document.querySelector("#app");
 
 const icon = (name) => {
   const paths = {
-    menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
     home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
     download:'<path d="M12 3v12m-5-5 5 5 5-5M4 19v2h16v-2"/>',
-    browser:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
-    settings:'<circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.6a8 8 0 0 1-1.5.9l-.3 1.8h-2.8l-.3-1.8a8 8 0 0 1-1.5-.9l-1.7.6-1.4-2.4 1.4-1.1a7 7 0 0 1 0-1.8l-1.4-1.1 1.4-2.4 1.7.6a8 8 0 0 1 1.5-.9l.3-1.8h2.8l.3 1.8a8 8 0 0 1 1.5.9l1.7-.6 1.4 2.4-1.4 1.1a7 7 0 0 1 0 1.8z"/>',
     paste:'<rect x="8" y="3" width="12" height="15" rx="2"/><path d="M5 7H4a1 1 0 0 0-1 1v13h12a1 1 0 0 0 1-1v-1"/>',
     link:'<path d="M10 13a5 5 0 0 0 7.1 0l3-3A5 5 0 0 0 13 2.9l-1.7 1.7M14 11a5 5 0 0 0-7.1 0l-3 3A5 5 0 0 0 11 21.1l1.7-1.7"/>',
     video:'<rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 10 4-3v10l-4-3z"/>',
@@ -19,8 +16,6 @@ const icon = (name) => {
     speed:'<path d="M3 17a9 9 0 1 1 18 0"/><path d="m12 13 4-4M6 17h12"/>',
     shield:'<path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z"/><path d="m9 12 2 2 4-4"/>',
     check:'<path d="m5 12 4 4L19 6"/>',
-    sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
-    close:'<path d="m6 6 12 12M18 6 6 18"/>'
   };
   return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+(paths[name]||paths.download)+'</svg>';
 };
@@ -28,27 +23,14 @@ const icon = (name) => {
 app.innerHTML = `
 <div class="app-shell">
   <header class="topbar">
-    <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu">${icon("menu")}</button>
-    <div class="brand"><div class="brand-mark"><span></span></div><div class="brand-copy"><b>Nice Downloader</b><small>FAST · PRIVATE · AD-FREE</small></div></div>
-    <button class="icon-btn theme-btn" id="themeBtn" aria-label="Toggle theme">${icon("sun")}</button>
+    <div class="brand"><div class="brand-mark"><span></span></div><div class="brand-copy"><b>Nice Downloader</b><small>VIDEO · AUDIO DOWNLOADER</small></div></div>
   </header>
 
-  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
-  <aside class="drawer" id="drawer" aria-label="Main menu" aria-hidden="true">
-    <div class="drawer-head"><div class="brand-mark"><span></span></div><div><b>Nice Downloader</b><small>Your media companion</small></div><button id="closeMenu" class="icon-btn close-btn" aria-label="Close menu">${icon("close")}</button></div>
-    <div class="drawer-label">WORKSPACE</div>
-    <button class="drawer-link active" data-tab="home">${icon("home")} Home</button>
-    <button class="drawer-link" data-tab="downloads">${icon("download")} Downloads</button>
-    <button class="drawer-link" data-tab="browser">${icon("browser")} Browser</button>
-    <div class="drawer-label drawer-label-lower">PREFERENCES</div>
-    <button class="drawer-link" data-tab="settings">${icon("settings")} Settings</button>
-    <div class="drawer-foot"><span class="online-dot"></span> PRIVATE · ON-DEVICE</div>
-  </aside>
 
   <main class="stage">
     <section class="page active" id="page-home">
       <div class="hero-banner">
-        <div class="hero-copy"><div class="eyebrow"><span class="eyebrow-dot"></span> ALL MEDIA DOWNLOADER</div><h1>Your media.<br><span>Your way.</span></h1><p>Video · Audio · Playlists · Fast &amp; simple</p></div>
+        <div class="hero-copy"><div class="eyebrow"><span class="eyebrow-dot"></span> ALL MEDIA DOWNLOADER</div><h1>Your media.<br><span>Your way.</span></h1><p>Download videos and audio in your preferred quality</p></div>
         <div class="hero-art"><div class="hero-ring"></div><div class="hero-download">${icon("download")}</div><div class="hero-play">▶</div></div>
         <div class="hero-glow"></div>
       </div>
@@ -57,11 +39,10 @@ app.innerHTML = `
       <div class="download-card">
         <label for="urlInput">PASTE YOUR MEDIA LINK</label>
         <div class="urlbox"><span class="url-icon">${icon("link")}</span><input id="urlInput" type="url" placeholder="Paste video or audio link here…" autocomplete="url"><button id="pasteBtn" class="paste-btn" aria-label="Paste from clipboard">${icon("paste")}</button></div>
-        <div class="quality-row"><label for="quality">QUALITY</label><select id="quality"><option value="best">Best available</option><option value="1080">Up to 1080p</option><option value="720">Up to 720p</option><option value="480">Up to 480p</option><option value="audio">Audio only</option></select></div>
+        <select id="quality" hidden><option value="best">Best</option><option value="audio">Audio</option></select>
         <div class="cookie-tools"><button id="importCookiesBtn" class="cookie-btn">Import YouTube cookies.txt</button><button id="clearCookiesBtn" class="cookie-clear">Clear</button></div><p id="cookieStatus" class="cookie-status">Optional: import your own YouTube cookies file if a signed-in session is required.</p>
         <button id="downloadBtn" class="primary"><span class="primary-icon">${icon("download")}</span> Download now <span class="button-arrow">→</span></button>
         <p class="status" id="status" role="status">Only download content you own or are allowed to save.</p>
-        <button id="browserBtn" class="browser-fallback" hidden>Open link in Chrome / browser ↗</button>
         <div class="progress-wrap" id="progressWrap" hidden><div class="progress-head"><span id="progressLabel">Connecting…</span><b id="progressValue">0%</b></div><div class="progress-track"><div id="progressBar"></div></div></div>
       </div>
     </section>
@@ -73,21 +54,6 @@ app.innerHTML = `
       <p class="storage-note">${icon("shield")} On Android 10+, completed files appear in Internal Storage / Download / NiceDownloader.</p>
     </section>
 
-    <section class="page" id="page-browser">
-      <div class="page-heading"><div class="eyebrow"><span class="eyebrow-dot"></span> BROWSER HANDOFF</div><h2>Open in browser</h2><p>Continue with your device's approved browser.</p></div>
-      <div class="browser-hero"><div class="browser-globe">${icon("browser")}</div><b>Browse with freedom</b><small>Open a website using Chrome or your default browser.</small></div>
-      <div class="download-card browser-card"><label for="browserUrl">WEBSITE LINK</label><div class="urlbox"><span class="url-icon">${icon("link")}</span><input id="browserUrl" type="url" placeholder="https://example.com" autocomplete="url"></div><button id="openBrowserBtn" class="primary">Open in browser <span class="button-arrow">↗</span></button><p class="status">Your organization's network rules still apply.</p></div>
-    </section>
-
-    <section class="page" id="page-settings">
-      <div class="page-heading"><div class="eyebrow"><span class="eyebrow-dot"></span> MAKE IT YOURS</div><h2>Settings</h2><p>Manage the app appearance and learn about its engine.</p></div>
-      <div class="download-card settings-list">
-        <div class="setting-row"><span class="setting-icon purple">${icon("sun")}</span><div class="setting-copy"><b>Appearance</b><small>Switch dark / light theme</small></div><button id="settingsThemeBtn" class="setting-action">Toggle</button></div>
-        <div class="setting-row"><span class="setting-icon cyan">${icon("speed")}</span><div class="setting-copy"><b>Download engine</b><small>yt-dlp · On-device processing</small></div><span class="setting-value">Native</span></div>
-        <div class="setting-row"><span class="setting-icon green">${icon("shield")}</span><div class="setting-copy"><b>Privacy</b><small>No ad SDK or cloud download server</small></div><span class="setting-value good">Ad-free</span></div>
-      </div>
-      <div class="about-card"><div class="about-logo"><div class="brand-mark"><span></span></div></div><div><b>Nice Downloader</b><small>Simple. Private. Yours.</small></div><span class="about-version">APP</span></div>
-    </section>
   </main>
 
   <div class="format-modal-backdrop" id="formatModal" hidden>
@@ -100,42 +66,23 @@ app.innerHTML = `
       <p class="format-note">Only download content you own or are allowed to save.</p>
     </section>
   </div>
-  <nav class="bottom-nav" aria-label="Main sections">
-    <button class="nav-item active" data-tab="home"><span>${icon("home")}</span><small>Home</small></button>
-    <button class="nav-item" data-tab="downloads"><span>${icon("download")}</span><small>Downloads</small></button>
-    <button class="nav-item" data-tab="browser"><span>${icon("browser")}</span><small>Browser</small></button>
-    <button class="nav-item" data-tab="settings"><span>${icon("settings")}</span><small>Settings</small></button>
+  <nav class="bottom-nav" aria-label="Download sections">
+    <button class="nav-item active" data-tab="home"><span>${icon("download")}</span><small>Download</small></button>
+    <button class="nav-item" data-tab="downloads"><span>${icon("video")}</span><small>Downloads</small></button>
   </nav>
 </div>`;
 
 const $ = selector => document.querySelector(selector);
 const input = $("#urlInput"), status = $("#status"), button = $("#downloadBtn");
-const browserBtn = $("#browserBtn"), progressWrap = $("#progressWrap");
+const progressWrap = $("#progressWrap");
 const progressBar = $("#progressBar"), progressValue = $("#progressValue"), progressLabel = $("#progressLabel");
 const downloadState = $("#downloadState");
 let progressListener = null;
 let downloadSessions = 0;
-let theme = "dark";
 
 function switchTab(tab) {
   document.querySelectorAll(".page").forEach(page => page.classList.toggle("active", page.id === "page-" + tab));
   document.querySelectorAll("[data-tab]").forEach(item => item.classList.toggle("active", item.dataset.tab === tab));
-  closeDrawer();
-}
-function openDrawer() {
-  $("#drawer").classList.add("open");
-  $("#drawer").setAttribute("aria-hidden", "false");
-  $("#drawerBackdrop").hidden = false;
-}
-function closeDrawer() {
-  $("#drawer").classList.remove("open");
-  $("#drawer").setAttribute("aria-hidden", "true");
-  $("#drawerBackdrop").hidden = true;
-}
-function toggleTheme() {
-  theme = theme === "dark" ? "light" : "dark";
-  document.body.classList.toggle("light", theme === "light");
-  document.querySelector('meta[name="theme-color"]').content = theme === "light" ? "#f3f5fb" : "#090d18";
 }
 function validWebUrl(value) {
   try { const url = new URL(value.trim()); return ["http:", "https:"].includes(url.protocol) && url.hostname ? url : null; }
@@ -149,12 +96,7 @@ function updateDownloadSummary(label) {
   $("#downloadStatus").textContent = label;
 }
 
-$("#menuBtn").addEventListener("click", openDrawer);
-$("#closeMenu").addEventListener("click", closeDrawer);
-$("#drawerBackdrop").addEventListener("click", closeDrawer);
 document.querySelectorAll("[data-tab]").forEach(item => item.addEventListener("click", () => switchTab(item.dataset.tab)));
-$("#themeBtn").addEventListener("click", toggleTheme);
-$("#settingsThemeBtn").addEventListener("click", toggleTheme);
 
 
 $("#importCookiesBtn").addEventListener("click", async () => {
@@ -182,26 +124,11 @@ $("#pasteBtn").addEventListener("click", async () => {
   try { input.value = await navigator.clipboard.readText(); status.textContent = input.value ? "Link pasted. Ready to download." : "Clipboard is empty."; }
   catch { status.textContent = "Clipboard unavailable. Paste your link manually."; }
 });
-$("#openBrowserBtn").addEventListener("click", async () => {
-  const url = validWebUrl($("#browserUrl").value);
-  if (!url) { $("#browserUrl").focus(); return; }
-  if (Capacitor.isNativePlatform()) {
-    try { await YtDlp.openInBrowser({url:url.href}); }
-    catch (error) { $(".browser-card .status").textContent = error?.message || "Could not open browser."; }
-  } else window.open(url.href, "_blank", "noopener");
-});
-browserBtn.addEventListener("click", async () => {
-  const url = validWebUrl(input.value);
-  if (!url) return;
-  try { await YtDlp.openInBrowser({url:url.href}); }
-  catch (error) { status.textContent = "Could not open browser: " + (error?.message || error); }
-});
 
 async function startSelectedDownload() {
   const url = validWebUrl(input.value);
   if (!url) { status.textContent = "Please enter a valid http or https link."; input.focus(); return; }
-  if (!Capacitor.isNativePlatform()) { status.textContent = "Native downloading is available in the Android APK. Use the Browser tab for web links."; return; }
-  browserBtn.hidden = true;
+  if (!Capacitor.isNativePlatform()) { status.textContent = "Native downloading is available in the Android APK."; return; }
   button.disabled = true;
   button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Starting…';
   progressWrap.hidden = false;
@@ -237,10 +164,9 @@ async function startSelectedDownload() {
     progressLabel.textContent = message.toLowerCase().includes("timed out") ? "Connection timed out" : "Download failed";
     updateDownloadSummary("Failed");
     downloadState.innerHTML = '<div class="manager-status failed-status">DOWNLOAD FAILED</div><div class="manager-file-icon failed-file">!</div><b>Could not complete download</b><small>' + escapeText(message) + '</small>';
-    browserBtn.hidden = false;
   } finally {
     button.disabled = false;
-    button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Download now <span class="button-arrow">→</span>';
+    button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Download now';
   }}
 
 let selectedFormat = "best";
@@ -290,7 +216,7 @@ button.addEventListener("click", async () => {
   status.textContent = "Fetching thumbnail and available formats…";
   try { showFormatChoices(await YtDlp.getInfo({url:url.href})); status.textContent = "Choose video quality or audio-only format."; }
   catch (error) { status.textContent = "Could not read media formats: " + (error?.message || error); }
-  finally { button.disabled = false; button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Download now <span class="button-arrow">→</span>'; }
+  finally { button.disabled = false; button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Download now'; }
 });
 $("#formatStart").addEventListener("click", async () => {
   $("#quality").value = selectedFormat; closeFormatModal(); await startSelectedDownload();
