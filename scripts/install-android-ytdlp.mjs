@@ -33,10 +33,10 @@ const permissions = [
 ];
 for (const permission of permissions) {
   const name = permission.match(/android:name="([^"]+)"/)[1];
-  if (!manifest.includes(name)) manifest = manifest.replace("<application", permission + "\\n    <application");
+  if (!manifest.includes(name)) manifest = manifest.replace("<application", permission + "\n    <application");
 }
 if (!manifest.includes("DownloadForegroundService")) {
-  manifest = manifest.replace("</application>", '        <service android:name="' + namespace + '.DownloadForegroundService" android:exported="false" android:foregroundServiceType="dataSync" />\\n    </application>');
+  manifest = manifest.replace("</application>", '        <service android:name="' + namespace + '.DownloadForegroundService" android:exported="false" android:foregroundServiceType="dataSync" />\n    </application>');
 }
 if (!manifest.includes('android.permission.INTERNET')) {
   manifest = manifest.replace("<manifest", '<manifest');
