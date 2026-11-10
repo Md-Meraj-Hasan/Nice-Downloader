@@ -43,7 +43,7 @@ app.innerHTML = `
         <div class="urlbox"><span class="url-icon">${icon("link")}</span><input id="urlInput" type="url" placeholder="Paste YouTube video link here…" autocomplete="url"><button id="pasteBtn" class="paste-btn" aria-label="Paste from clipboard">${icon("paste")}</button></div>
         <select id="quality" hidden><option value="best">Best</option><option value="audio">Audio</option></select>
         
-        <button id="downloadBtn" class="primary"><span class="primary-icon">${icon("download")}</span> Download now <span class="button-arrow">→</span></button>
+        <button id="downloadBtn" class="primary"><span class="primary-icon">${icon("download")}</span> Load video details <span class="button-arrow">→</span></button>
         <p class="status" id="status" role="status">Only download content you own or are allowed to save.</p>
         <div class="progress-wrap" id="progressWrap" hidden><div class="progress-head"><span id="progressLabel">Connecting…</span><b id="progressValue">0%</b></div><div class="progress-track"><div id="progressBar"></div></div></div>
       </div>
@@ -117,11 +117,21 @@ async function readYouTubeDetails(videoUrl) {
   if (!videoId) throw new Error("Unsupported YouTube video link.");
   const canonicalUrl = "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId);
   const endpoint = "https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(canonicalUrl);
-  const response = await YtDlp.httpRequest({ url: endpoint, method: "GET", headers: {}, body: "" });
+  let response;
   let data;
-  try { data = JSON.parse(response.body || "{}"); }
-  catch { throw new Error("YouTube returned an invalid oEmbed response."); }
-  if (Number(response.status) < 200 || Number(response.status) >= 300) {
+  try {
+    response = await fetch(endpoint, {
+      method: "GET",
+      mode: "cors",
+      credentials: "omit",
+      headers: { "Accept": "application/json" },
+      cache: "no-store"
+    });
+    data = await response.json();
+  } catch (error) {
+    throw new Error("YouTube oEmbed connection failed in Android WebView: " + (error?.message || "network connection closed"));
+  }
+  if (!response.ok) {
     throw new Error("YouTube oEmbed request failed (HTTP " + response.status + "). The video may be private, unavailable, or unsupported.");
   }
   return {
@@ -322,7 +332,7 @@ function showFormatChoices(info) {
   $("#formatTitle").textContent = activeVideoTitle;
   const duration = Number(info.duration) || 0;
   $("#formatSubtitle").textContent = (info.uploader ? info.uploader + " · " : "") +
-    (duration ? Math.floor(duration / 60) + ":" + String(Math.floor(duration % 60)).padStart(2, "0") : "Available formats");
+    (duration ? Math.floor(duration / 60) + ":" + String(Math.floor(duration % 60)).padStart(2, "0") : "YouTube video preview");
   const thumb = $("#formatThumbnail");
   if (info.thumbnail && info.thumbnail.startsWith("https://")) {
     thumb.src = info.thumbnail; thumb.hidden = false; $("#formatThumbnailFallback").hidden = true;
