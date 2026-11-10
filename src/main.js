@@ -155,7 +155,8 @@ async function readYouTubeDetails(videoUrl) {
     youtubeClientPromise ||= Innertube.create({
       client_type: "WEB",
       retrieve_player: true,
-      enable_session_cache: true
+      enable_session_cache: true,
+      fetch: youtubeNativeFetch
     });
     const youtube = await youtubeClientPromise;
     const info = await youtube.getBasicInfo(videoId);
