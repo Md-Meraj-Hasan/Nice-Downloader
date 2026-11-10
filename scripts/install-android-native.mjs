@@ -19,6 +19,14 @@ if (/minifyEnabled\s+false/.test(appGradle)) appGradle = appGradle.replace(/mini
 if (/minifyEnabled\s+true/.test(appGradle) && !/shrinkResources\s+true/.test(appGradle)) {
   appGradle = appGradle.replace(/minifyEnabled\s+true/, "minifyEnabled true\n            shrinkResources true");
 }
+const releaseBlockMatch = appGradle.match(/release\s*\{[\s\S]*?\n\s*\}/);
+if (!releaseBlockMatch) throw new Error("Release build type block not found.");
+if (!/signingConfig\s+signingConfigs\.debug/.test(releaseBlockMatch[0])) {
+  const hardenedReleaseBlock = releaseBlockMatch[0].replace(/release\s*\{/, 'release {\n            signingConfig signingConfigs.debug\n            debuggable false');
+  appGradle = appGradle.replace(releaseBlockMatch[0], hardenedReleaseBlock);
+} else {
+  appGradle = appGradle.replace(/debuggable\s+true/, "debuggable false");
+}
 const proguardPath = "android/app/proguard-rules.pro";
 const proguardRules = "\n# Capacitor discovers native plugins through their annotations.\n-keep @com.getcapacitor.annotation.CapacitorPlugin class * { *; }\n-keep class **.YouTubeDownloadPlugin { *; }\n";
 fs.appendFileSync(proguardPath, proguardRules);
