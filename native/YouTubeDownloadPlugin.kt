@@ -82,6 +82,61 @@ class YouTubeDownloadPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun httpRequest(call: PluginCall) {
+        val rawUrl = call.getString("url")?.trim().orEmpty()
+        val method = call.getString("method")?.uppercase(Locale.ROOT) ?: "GET"
+        val uri = runCatching { Uri.parse(rawUrl) }.getOrNull()
+        val host = uri?.host?.lowercase(Locale.ROOT).orEmpty()
+        val allowedHost = host == "youtube.com" || host.endsWith(".youtube.com") ||
+            host == "youtubei.googleapis.com" || host == "googlevideo.com" ||
+            host.endsWith(".googlevideo.com") || host == "ytimg.com" || host.endsWith(".ytimg.com")
+        if (uri == null || uri.scheme != "https" || !allowedHost || method !in setOf("GET", "POST", "HEAD")) {
+            call.reject("Blocked YouTube network request.")
+            return
+        }
+        thread(name = "NiceDownloader-youtube-http") {
+            var connection: HttpURLConnection? = null
+            try {
+                connection = URL(rawUrl).openConnection() as HttpURLConnection
+                connection.requestMethod = method
+                connection.connectTimeout = 20000
+                connection.readTimeout = 30000
+                connection.instanceFollowRedirects = true
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
+                val headers = call.getObject("headers")
+                headers?.keys()?.forEach { key ->
+                    val value = headers.optString(key)
+                    if (key.lowercase(Locale.ROOT) !in setOf("host", "connection", "content-length", "origin", "referer")) {
+                        connection?.setRequestProperty(key, value)
+                    }
+                }
+                if (method == "POST") {
+                    connection.doOutput = true
+                    if (connection.getRequestProperty("Content-Type") == null) connection.setRequestProperty("Content-Type", "application/json")
+                    val payload = call.getString("body")?.toByteArray(Charsets.UTF_8) ?: ByteArray(0)
+                    connection.outputStream.use { it.write(payload) }
+                }
+                val status = connection.responseCode
+                val stream = if (status >= 400) connection.errorStream else connection.inputStream
+                val responseBody = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+                val responseHeaders = JSObject()
+                connection.headerFields.forEach { (key, values) ->
+                    if (key != null && !values.isNullOrEmpty()) responseHeaders.put(key, values.joinToString(", "))
+                }
+                call.resolve(JSObject().apply {
+                    put("status", status)
+                    put("body", responseBody)
+                    put("headers", responseHeaders)
+                })
+            } catch (error: Exception) {
+                call.reject("YouTube request failed: ${error.message ?: "network error"}")
+            } finally {
+                connection?.disconnect()
+            }
+        }
+    }
+
+    @PluginMethod
     fun downloadStream(call: PluginCall) {
         // Android 10+ uses MediaStore/scoped storage; request no broad storage permission there.
         // Android 9 and older need the legacy WRITE_EXTERNAL_STORAGE runtime permission.
