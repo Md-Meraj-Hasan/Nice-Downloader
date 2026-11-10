@@ -26,9 +26,9 @@ if (!appGradle.includes("signingConfigs")) {
         }
     }
 `;
-  if (!/buildTypes\\s*\\{/.test(appGradle)) throw new Error("Android buildTypes block not found for release signing.");
+  if (!/buildTypes\s*\{/.test(appGradle)) throw new Error("Android buildTypes block not found for release signing.");
   appGradle = appGradle.replace(/buildTypes\\s*\\{/, signingBlock + "    buildTypes {");
-  appGradle = appGradle.replace(/release\\s*\\{/, 'release {\\n            signingConfig signingConfigs.release');
+  appGradle = appGradle.replace(/release\s*\{/, 'release {\n            signingConfig signingConfigs.release');
 }
 
 // Keep the release APK lean while retaining the Capacitor plugin entry point.
