@@ -173,6 +173,70 @@ public class YtDlpPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void getInfo(PluginCall call) {
+        String rawUrl = call.getString("url");
+        if (rawUrl == null || rawUrl.trim().isEmpty()) { call.reject("A media URL is required."); return; }
+        Uri uri = Uri.parse(rawUrl.trim());
+        if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) || uri.getHost() == null) {
+            call.reject("Only valid HTTP or HTTPS links are supported."); return;
+        }
+        new Thread(() -> {
+            try {
+                synchronized (YtDlpPlugin.class) {
+                    if (!initialized) { YtDlp.init(getContext()); initialized = true; }
+                }
+                YtDlpRequest request = new YtDlpRequest(rawUrl.trim())
+                    .addOption("--dump-single-json")
+                    .addOption("--skip-download")
+                    .addOption("--no-warnings")
+                    .addOption("--no-playlist")
+                    .addOption("--socket-timeout", "45")
+                    .addOption("--force-ipv4")
+                    .addOption("--extractor-args", "youtube:player_client=android");
+                File cookieFile = new File(getContext().getFilesDir(), "youtube-cookies.txt");
+                if (cookieFile.isFile() && cookieFile.length() > 0) request.addOption("--cookies", cookieFile.getAbsolutePath());
+                YtDlpResponse response = YtDlp.execute(request);
+                if (response == null || !response.isSuccess()) {
+                    String error = response == null ? "No response from media extractor." : response.getErrorOutput();
+                    throw new Exception(error == null || error.isEmpty() ? "Could not read video details." : error);
+                }
+                org.json.JSONObject info = new org.json.JSONObject(response.getOutput());
+                JSObject result = new JSObject();
+                result.put("title", info.optString("title", "Media"));
+                result.put("thumbnail", info.optString("thumbnail", ""));
+                result.put("duration", info.optDouble("duration", 0));
+                result.put("uploader", info.optString("uploader", info.optString("channel", "")));
+                org.json.JSONArray formats = info.optJSONArray("formats");
+                org.json.JSONArray choices = new org.json.JSONArray();
+                java.util.HashSet<String> seen = new java.util.HashSet<>();
+                if (formats != null) {
+                    for (int i = 0; i < formats.length(); i++) {
+                        org.json.JSONObject item = formats.optJSONObject(i);
+                        if (item == null) continue;
+                        String id = item.optString("format_id", "");
+                        int height = item.optInt("height", 0);
+                        String vcodec = item.optString("vcodec", "none");
+                        String acodec = item.optString("acodec", "none");
+                        if (id.isEmpty() || height <= 0 || "none".equals(vcodec)) continue;
+                        String key = height + ":" + ("none".equals(acodec) ? "video-only" : "audio-video");
+                        if (seen.contains(key)) continue;
+                        seen.add(key);
+                        JSObject choice = new JSObject();
+                        choice.put("formatId", id);
+                        choice.put("height", height);
+                        choice.put("ext", item.optString("ext", ""));
+                        choice.put("hasAudio", !"none".equals(acodec));
+                        choice.put("filesize", item.optLong("filesize", item.optLong("filesize_approx", 0)));
+                        choices.put(choice);
+                    }
+                }
+                result.put("formats", choices);
+                call.resolve(result);
+            } catch (Exception e) { call.reject("Could not fetch media details: " + e.getMessage()); }
+        }, "NiceDownloader-media-info").start();
+    }
+
+    @PluginMethod
     public void download(PluginCall call) {
         String rawUrl = call.getString("url");
         String quality = call.getString("quality", "best");
@@ -186,7 +250,11 @@ public class YtDlpPlugin extends Plugin {
             return;
         }
         String format;
-        switch (quality) {
+        if (quality.startsWith("format:")) {
+            String requestedId = quality.substring(7);
+            if (!requestedId.matches("[A-Za-z0-9._+-]+")) { call.reject("Invalid format selection."); return; }
+            format = requestedId + "+bestaudio/best";
+        } else switch (quality) {
             case "1080": format = "best[height<=1080]"; break;
             case "720": format = "best[height<=720]"; break;
             case "480": format = "best[height<=480]"; break;
