@@ -40,7 +40,6 @@ app.innerHTML = `
         <label for="urlInput">PASTE YOUR MEDIA LINK</label>
         <div class="urlbox"><span class="url-icon">${icon("link")}</span><input id="urlInput" type="url" placeholder="Paste video or audio link here…" autocomplete="url"><button id="pasteBtn" class="paste-btn" aria-label="Paste from clipboard">${icon("paste")}</button></div>
         <select id="quality" hidden><option value="best">Best</option><option value="audio">Audio</option></select>
-        <div class="cookie-tools"><button id="importCookiesBtn" class="cookie-btn">Import YouTube cookies.txt</button><button id="clearCookiesBtn" class="cookie-clear">Clear</button></div><p id="cookieStatus" class="cookie-status">Optional: import your own YouTube cookies file if a signed-in session is required.</p>
         <button id="downloadBtn" class="primary"><span class="primary-icon">${icon("download")}</span> Download now <span class="button-arrow">→</span></button>
         <p class="status" id="status" role="status">Only download content you own or are allowed to save.</p>
         <div class="progress-wrap" id="progressWrap" hidden><div class="progress-head"><span id="progressLabel">Connecting…</span><b id="progressValue">0%</b></div><div class="progress-track"><div id="progressBar"></div></div></div>
@@ -99,27 +98,6 @@ function updateDownloadSummary(label) {
 document.querySelectorAll("[data-tab]").forEach(item => item.addEventListener("click", () => switchTab(item.dataset.tab)));
 
 
-$("#importCookiesBtn").addEventListener("click", async () => {
-  const cookieStatus = $("#cookieStatus");
-  if (!Capacitor.isNativePlatform()) { cookieStatus.textContent = "Cookie import is available in the installed Android APK."; return; }
-  cookieStatus.textContent = "Opening Android file picker… Choose a Netscape-format cookies.txt file.";
-  $("#importCookiesBtn").disabled = true;
-  try {
-    const result = await YtDlp.pickCookies();
-    if (!result || result.imported !== true) throw new Error("Android did not confirm the cookie import. Please try again.");
-    cookieStatus.textContent = "✓ Imported " + result.cookies + " cookies from " + (result.fileName || "selected file") + ". Saved privately on this device.";
-  } catch (error) {
-    const message = error?.message || error?.error || String(error);
-    cookieStatus.textContent = "Import not completed: " + message;
-  } finally {
-    $("#importCookiesBtn").disabled = false;
-  }
-});
-$("#clearCookiesBtn").addEventListener("click", async () => {
-  if (!Capacitor.isNativePlatform()) return;
-  try { await YtDlp.clearCookies(); $("#cookieStatus").textContent = "Saved YouTube cookies cleared."; }
-  catch (error) { $("#cookieStatus").textContent = error?.message || "Could not clear cookies."; }
-});
 $("#pasteBtn").addEventListener("click", async () => {
   try { input.value = await navigator.clipboard.readText(); status.textContent = input.value ? "Link pasted. Ready to download." : "Clipboard is empty."; }
   catch { status.textContent = "Clipboard unavailable. Paste your link manually."; }
