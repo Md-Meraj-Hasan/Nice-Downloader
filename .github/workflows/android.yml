@@ -40,24 +40,13 @@ jobs:
           if [ -n "$APKSIGNER" ]; then
             "$APKSIGNER" verify --verbose "$apk"
           else
-            echo "apksigner binary not found in runner search paths; checking release signing certificate entry instead."
-            unzip -Z1 "$apk" | grep -E '^META-INF/[^/]+\\.(RSA|DSA|EC)
-          ls -lh "$apk"
-          if unzip -Z1 "$apk" | grep -Eiq '(^|/)(chaquopy|python[0-9.]*|yt.?dlp|ffmpeg)(/|\\.|$)|libpython'; then
-            echo "Forbidden Python/yt-dlp/FFmpeg runtime file detected"
-            exit 1
-          fi
-          echo "Single APK audit passed."
-      - name: Upload one installable APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Nice-Downloader-APK
-          path: android/app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: error
-
+            echo "apksigner not found; verifying the APK JAR signature."
+            cert_entry="$(unzip -Z1 "$apk" | grep -Ei '^META-INF/[^/]+\.(RSA|DSA|EC)$' || true)"
+            test -n "$cert_entry"
+            jarsigner -verify "$apk"
           fi
           ls -lh "$apk"
-          if unzip -Z1 "$apk" | grep -Eiq '(^|/)(chaquopy|python[0-9.]*|yt.?dlp|ffmpeg)(/|\\.|$)|libpython'; then
+          if unzip -Z1 "$apk" | grep -Eiq '(^|/)(chaquopy|python[0-9.]*|yt.?dlp|ffmpeg)(/|\.|$)|libpython'; then
             echo "Forbidden Python/yt-dlp/FFmpeg runtime file detected"
             exit 1
           fi
