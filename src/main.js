@@ -190,19 +190,35 @@ function showFormatChoices(info) {
   } else { thumb.hidden = true; $("#formatThumbnailFallback").hidden = false; }
   const list = $("#formatOptions"); list.innerHTML = "";
   const formats = Array.isArray(info.formats) ? info.formats : [];
-  const heights = [...new Set(formats.map(f => Number(f.height)).filter(h => h > 0))].sort((a,b) => b-a);
+  const byHeight = new Map();
+  formats.forEach(format => {
+    const height = Number(format.height) || 0;
+    if (!height || !format.formatId) return;
+    const current = byHeight.get(height);
+    // Prefer a combined audio+video format when available; otherwise let yt-dlp
+    // merge this video-only stream with the best compatible audio stream.
+    if (!current || (format.hasAudio && !current.hasAudio) ||
+        (format.hasAudio === current.hasAudio && Number(format.filesize) > Number(current.filesize))) {
+      byHeight.set(height, format);
+    }
+  });
+  const heights = [...byHeight.keys()].sort((a,b) => b-a);
   heights.forEach((height, index) => {
-    const item = formats.find(f => Number(f.height) === height);
+    const item = byHeight.get(height);
     const label = document.createElement("label"); label.className = "format-choice";
-    const radio = document.createElement("input"); radio.type = "radio"; radio.name = "mediaFormat"; radio.value = "format:" + item.formatId; radio.checked = index === 0;
+    const radio = document.createElement("input"); radio.type = "radio"; radio.name = "mediaFormat";
+    radio.value = "height:" + height; radio.checked = index === 0;
     const detail = document.createElement("span");
     const size = formatSize(item.filesize);
-    detail.innerHTML = "<b>" + height + "p</b><small>" + String(item.ext || "video").toUpperCase() + (size ? " · " + size : "") + "</small>";
+    const fps = item.fps ? " · " + Math.round(item.fps) + " FPS" : "";
+    const audioText = item.hasAudio ? "Audio included" : "Audio merged automatically";
+    detail.innerHTML = "<b>" + height + "p</b><small>" + String(item.ext || "video").toUpperCase() +
+      fps + " · " + audioText + (size ? " · " + size : "") + "</small>";
     label.append(radio, detail); list.append(label);
   });
   const audio = document.createElement("label"); audio.className = "format-choice audio-choice";
   const ar = document.createElement("input"); ar.type = "radio"; ar.name = "mediaFormat"; ar.value = "audio"; ar.checked = heights.length === 0;
-  const ad = document.createElement("span"); ad.innerHTML = "<b>Only Audio</b><small>Best available audio</small>";
+  const ad = document.createElement("span"); ad.innerHTML = "<b>Only Audio</b><small>Best available audio stream</small>";
   audio.append(ar, ad); list.append(audio);
   selectedFormat = list.querySelector('input[name="mediaFormat"]:checked')?.value || "audio";
   list.querySelectorAll('input[name="mediaFormat"]').forEach(r => r.addEventListener("change", () => selectedFormat = r.value));
@@ -213,7 +229,7 @@ button.addEventListener("click", async () => {
   if (!url) { status.textContent = "Please enter a valid http or https link."; input.focus(); return; }
   if (!Capacitor.isNativePlatform()) { status.textContent = "Format selection is available in the Android APK."; return; }
   button.disabled = true; button.textContent = "Reading video details…";
-  status.textContent = "Fetching thumbnail and available formats…";
+  status.textContent = "Reading all available video resolutions and audio formats…";
   try { showFormatChoices(await YtDlp.getInfo({url:url.href})); status.textContent = "Choose video quality or audio-only format."; }
   catch (error) { status.textContent = "Could not read media formats: " + (error?.message || error); }
   finally { button.disabled = false; button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Download now'; }
