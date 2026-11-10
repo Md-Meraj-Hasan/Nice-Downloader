@@ -52,14 +52,14 @@ class YouTubeDownloadPlugin : Plugin() {
                     }
                 }
                 destination = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    getContext().contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
                 } else {
                     val folder = java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "NiceDownloader")
                     if (!folder.exists()) folder.mkdirs()
                     val file = java.io.File(folder, safeName)
                     Uri.fromFile(file)
                 } ?: throw IllegalStateException("Could not create destination file")
-                val output = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) contentResolver.openOutputStream(destination!!) else java.io.FileOutputStream(java.io.File(destination!!.path!!))
+                val output = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) getContext().contentResolver.openOutputStream(destination!!) else java.io.FileOutputStream(java.io.File(destination!!.path!!))
                 if (output == null) throw IllegalStateException("Could not open destination file")
                 BufferedInputStream(connection.inputStream).use { input ->
                     BufferedOutputStream(output).use { out ->
@@ -81,7 +81,7 @@ class YouTubeDownloadPlugin : Plugin() {
                     }
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    contentResolver.update(destination!!, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+                    getContext().contentResolver.update(destination!!, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
                 }
                 val result = JSObject().apply {
                     put("success", true)
@@ -92,7 +92,7 @@ class YouTubeDownloadPlugin : Plugin() {
                 }
                 call.resolve(result)
             } catch (error: Exception) {
-                destination?.let { runCatching { contentResolver.delete(it, null, null) } }
+                destination?.let { runCatching { getContext().contentResolver.delete(it, null, null) } }
                 call.reject("Download failed: ${error.message ?: "network error"}")
             } finally {
                 connection?.disconnect()
