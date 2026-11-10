@@ -129,7 +129,7 @@ function switchTab(tab) {
 function validWebUrl(value) {
   try {
     const url = new URL(value.trim());
-    const host = url.hostname.toLowerCase().replace(/^www\\./, "");
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
     const isYouTube = host === "youtube.com" || host.endsWith(".youtube.com") ||
       host === "youtu.be" || host.endsWith(".youtu.be");
     return ["http:", "https:"].includes(url.protocol) && isYouTube ? url : null;
