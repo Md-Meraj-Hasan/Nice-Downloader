@@ -23,11 +23,11 @@ jobs:
         run: npm run build
       - name: Generate Android project
         run: npx cap add android
-      - name: Install Android native bridge
-        run: node scripts/install-android-ytdlp.mjs
+      - name: Install minimal Kotlin downloader
+        run: node scripts/install-android-native.mjs
       - name: Sync Capacitor
         run: npx cap sync android
-      - name: Build debug APK
+      - name: Build debug APK (size baseline)
         working-directory: android
         run: ./gradlew assembleDebug
       - name: Report APK size
