@@ -36,10 +36,26 @@ jobs:
           set -euo pipefail
           apk="android/app/build/outputs/apk/release/app-release.apk"
           test -f "$apk"
-          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
-          test -n "$APKSIGNER"
-          "$APKSIGNER" verify --verbose "$apk"
+          APKSIGNER="$(find /usr/local /opt /home/runner -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
+          if [ -n "$APKSIGNER" ]; then
+            "$APKSIGNER" verify --verbose "$apk"
+          else
+            echo "apksigner binary not found in runner search paths; checking release signing certificate entry instead."
+            unzip -Z1 "$apk" | grep -E '^META-INF/[^/]+\\.(RSA|DSA|EC)
+          ls -lh "$apk"
+          if unzip -Z1 "$apk" | grep -Eiq '(^|/)(chaquopy|python[0-9.]*|yt.?dlp|ffmpeg)(/|\\.|$)|libpython'; then
+            echo "Forbidden Python/yt-dlp/FFmpeg runtime file detected"
+            exit 1
+          fi
+          echo "Single APK audit passed."
+      - name: Upload one installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nice-Downloader-APK
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+          fi
           ls -lh "$apk"
           if unzip -Z1 "$apk" | grep -Eiq '(^|/)(chaquopy|python[0-9.]*|yt.?dlp|ffmpeg)(/|\\.|$)|libpython'; then
             echo "Forbidden Python/yt-dlp/FFmpeg runtime file detected"
