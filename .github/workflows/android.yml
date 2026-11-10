@@ -36,7 +36,9 @@ jobs:
           set -euo pipefail
           apk="android/app/build/outputs/apk/debug/app-debug.apk"
           test -f "$apk"
-          apksigner verify --verbose "$apk"
+          APKSIGNER="$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose "$apk"
           ls -lh "$apk"
           if unzip -Z1 "$apk" | grep -Eiq '(^|/)(chaquopy|python[0-9.]*|yt.?dlp|ffmpeg)(/|\\.|$)|libpython'; then
             echo "Forbidden Python/yt-dlp/FFmpeg runtime file detected"
