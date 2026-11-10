@@ -47,6 +47,21 @@ function ensureManifestPermission(permissionXml, permissionName) {
 ensureManifestPermission('<uses-permission android:name="android.permission.INTERNET" />', "android.permission.INTERNET");
 // Legacy file-path writes are used only on Android 9 and below. Android 10+ uses MediaStore.
 ensureManifestPermission('<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />', "android.permission.WRITE_EXTERNAL_STORAGE");
+// Harden app data and transport defaults. The downloader needs HTTPS only.
+const applicationTag = manifest.match(/<application\\b[^>]*>/);
+if (!applicationTag) throw new Error("AndroidManifest application tag not found for security hardening.");
+let hardenedApplicationTag = applicationTag[0];
+if (!/\\bandroid:allowBackup=/.test(hardenedApplicationTag)) {
+  hardenedApplicationTag = hardenedApplicationTag.replace("<application", '<application android:allowBackup="false"');
+} else {
+  hardenedApplicationTag = hardenedApplicationTag.replace(/android:allowBackup="[^"]*"/, 'android:allowBackup="false"');
+}
+if (!/\\bandroid:usesCleartextTraffic=/.test(hardenedApplicationTag)) {
+  hardenedApplicationTag = hardenedApplicationTag.replace("<application", '<application android:usesCleartextTraffic="false"');
+} else {
+  hardenedApplicationTag = hardenedApplicationTag.replace(/android:usesCleartextTraffic="[^"]*"/, 'android:usesCleartextTraffic="false"');
+}
+manifest = manifest.replace(applicationTag[0], hardenedApplicationTag);
 fs.writeFileSync(manifestPath, manifest);
 
 const javaMain = path.join(javaDir, "MainActivity.java");
