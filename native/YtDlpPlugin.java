@@ -35,6 +35,18 @@ import java.util.concurrent.TimeoutException;
 public class YtDlpPlugin extends Plugin {
     private static boolean initialized = false;
 
+    private boolean isSupportedYouTubeUrl(String rawUrl) {
+        if (rawUrl == null) return false;
+        Uri uri = Uri.parse(rawUrl.trim());
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        if (!("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) || host == null) return false;
+        host = host.toLowerCase(java.util.Locale.ROOT);
+        if (host.startsWith("www.")) host = host.substring(4);
+        return host.equals("youtube.com") || host.endsWith(".youtube.com") ||
+            host.equals("youtu.be") || host.endsWith(".youtu.be");
+    }
+
 
     @PluginMethod
     public void openInBrowser(PluginCall call) {
@@ -44,8 +56,8 @@ public class YtDlpPlugin extends Plugin {
             return;
         }
         Uri uri = Uri.parse(rawUrl.trim());
-        if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) || uri.getHost() == null) {
-            call.reject("Only valid HTTP or HTTPS links are supported.");
+        if (!isSupportedYouTubeUrl(rawUrl)) {
+            call.reject("Unsupported website. Nice Downloader currently supports YouTube only.");
             return;
         }
         try {
@@ -177,8 +189,9 @@ public class YtDlpPlugin extends Plugin {
         String rawUrl = call.getString("url");
         if (rawUrl == null || rawUrl.trim().isEmpty()) { call.reject("A media URL is required."); return; }
         Uri uri = Uri.parse(rawUrl.trim());
-        if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) || uri.getHost() == null) {
-            call.reject("Only valid HTTP or HTTPS links are supported."); return;
+        if (!isSupportedYouTubeUrl(rawUrl)) {
+            call.reject("Unsupported website. Nice Downloader currently supports YouTube only.");
+            return;
         }
         new Thread(() -> {
             try {
@@ -246,8 +259,8 @@ public class YtDlpPlugin extends Plugin {
             return;
         }
         Uri uri = Uri.parse(rawUrl.trim());
-        if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) || uri.getHost() == null) {
-            call.reject("Only valid HTTP or HTTPS links are supported.");
+        if (!isSupportedYouTubeUrl(rawUrl)) {
+            call.reject("Unsupported website. Nice Downloader currently supports YouTube only.");
             return;
         }
         String format;
