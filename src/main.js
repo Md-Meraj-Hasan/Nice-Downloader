@@ -114,7 +114,7 @@ async function readYouTubeFormats(videoUrl) {
     const key = hasVideo ? "v:" + height + ":" + ext : "a:" + ext;
     if (seen.has(key)) continue;
     seen.add(key);
-    formats.push({ formatId: String(item.itag || formats.length), height, ext, filesize: Number(item.content_length || item.contentLength || 0), url: streamUrl, hasVideo, hasAudio });
+    formats.push({ formatId: String(item.itag || formats.length), height, ext, mimeType: String(mime).split(";")[0].trim().toLowerCase(), filesize: Number(item.content_length || item.contentLength || 0), url: streamUrl, hasVideo, hasAudio });
   }
   const video = formats.filter(f => f.hasVideo && f.hasAudio).sort((a,b) => b.height-a.height);
   const audio = formats.filter(f => !f.hasVideo && f.hasAudio);
@@ -178,7 +178,7 @@ async function startSelectedDownload() {
       });
     }
     if (!activeFormat?.url) throw new Error("Please select a supported YouTube format first.");
-    const result = await YtDlp.downloadStream({streamUrl:activeFormat.url,title:activeVideoTitle,extension:activeFormat.ext});
+    const result = await YtDlp.downloadStream({streamUrl:activeFormat.url,title:activeVideoTitle,extension:activeFormat.ext,mimeType:activeFormat.mimeType});
     progressBar.style.width = "100%";
     progressValue.textContent = "100%";
     progressLabel.textContent = "Completed";
