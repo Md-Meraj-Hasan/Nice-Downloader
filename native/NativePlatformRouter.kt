@@ -6,11 +6,11 @@ import android.net.Uri
  * Explicit platform gate for the native downloader.
  *
  * This is deliberately separate from extraction: a URL is accepted only for
- * the three platforms requested by the app. It does not claim that a private,
+ * YouTube only; Instagram and Facebook are intentionally unsupported. It does not claim that a private,
  * login-protected, or unsupported media page can be downloaded.
  */
 internal object NativePlatformRouter {
-    enum class Platform { YOUTUBE, INSTAGRAM, FACEBOOK }
+    enum class Platform { YOUTUBE }
 
     data class Target(val platform: Platform, val canonicalUrl: String)
 
@@ -27,11 +27,8 @@ internal object NativePlatformRouter {
         val platform = when {
             host == "youtube.com" || host.endsWith(".youtube.com") ||
                 host == "youtu.be" || host.endsWith(".youtu.be") -> Platform.YOUTUBE
-            host == "instagram.com" || host.endsWith(".instagram.com") -> Platform.INSTAGRAM
-            host == "facebook.com" || host.endsWith(".facebook.com") ||
-                host == "fb.watch" || host.endsWith(".fb.watch") -> Platform.FACEBOOK
             else -> throw IllegalArgumentException(
-                "Unsupported website. Nice Downloader supports YouTube, Instagram and Facebook."
+                "Unsupported website. Nice Downloader currently supports YouTube only."
             )
         }
         return Target(platform, uri.toString())
