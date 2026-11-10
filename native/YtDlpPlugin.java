@@ -1,6 +1,12 @@
 package __PACKAGE__;
 
 import android.net.Uri;
+import android.content.ContentValues;
+import android.os.Build;
+import android.provider.MediaStore;
+import android.webkit.MimeTypeMap;
+import java.io.FileInputStream;
+import java.io.OutputStream;
 import android.provider.OpenableColumns;
 import android.content.Intent;
 import android.app.Activity;
@@ -114,6 +120,58 @@ public class YtDlpPlugin extends Plugin {
         if (!cookieFile.exists() || cookieFile.delete()) call.resolve();
         else call.reject("Could not remove saved cookies file.");
     }
+    private File findNewestDownload(File folder, long startedAt) throws Exception {
+        File[] files = folder.listFiles();
+        if (files == null) throw new Exception("Download folder could not be read.");
+        File newest = null;
+        for (File file : files) {
+            if (file.isFile() && !file.getName().endsWith(".part") &&
+                !file.getName().endsWith(".ytdl") && file.lastModified() >= startedAt - 2000 &&
+                (newest == null || file.lastModified() > newest.lastModified())) {
+                newest = file;
+            }
+        }
+        if (newest == null || newest.length() == 0) throw new Exception("yt-dlp reported success, but the completed video file was not found.");
+        return newest;
+    }
+
+    // Android 10+ MediaStore makes the file visible in the public Downloads collection.
+    // On older Android versions retain the app-specific file and return its exact path.
+    private String publishToPublicDownloads(File source) throws Exception {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return source.getAbsolutePath();
+        String extension = "";
+        int dot = source.getName().lastIndexOf('.');
+        if (dot >= 0) extension = source.getName().substring(dot + 1).toLowerCase();
+        String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
+        if (mime == null) mime = "application/octet-stream";
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME, source.getName());
+        values.put(MediaStore.MediaColumns.MIME_TYPE, mime);
+        values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/NiceDownloader");
+        values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+        Uri destination = getContext().getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+        if (destination == null) throw new Exception("Android could not create a file in public Downloads.");
+        boolean copied = false;
+        try (InputStream input = new FileInputStream(source);
+             OutputStream output = getContext().getContentResolver().openOutputStream(destination, "w")) {
+            if (output == null) throw new Exception("Android could not open the public Downloads file.");
+            byte[] buffer = new byte[64 * 1024];
+            int count;
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            output.flush();
+            copied = true;
+        } finally {
+            if (copied) {
+                ContentValues ready = new ContentValues();
+                ready.put(MediaStore.MediaColumns.IS_PENDING, 0);
+                getContext().getContentResolver().update(destination, ready, null, null);
+            } else {
+                getContext().getContentResolver().delete(destination, null, null);
+            }
+        }
+        return Environment.DIRECTORY_DOWNLOADS + "/NiceDownloader/" + source.getName();
+    }
+
     @PluginMethod
     public void download(PluginCall call) {
         String rawUrl = call.getString("url");
@@ -174,6 +232,7 @@ public class YtDlpPlugin extends Plugin {
                 connecting.put("etaSeconds", 0);
                 connecting.put("message", "Connecting to source and reading media information…");
                 notifyListeners("downloadProgress", connecting);
+                long downloadStartedAt = System.currentTimeMillis();
                 Future<YtDlpResponse> future = YtDlp.executeAsync(request, (progress, eta, line) -> {
                     JSObject event = new JSObject();
                     event.put("progress", Math.max(0, Math.min(100, progress)));
@@ -191,10 +250,15 @@ public class YtDlpPlugin extends Plugin {
                     return;
                 }
                 if (response != null && response.isSuccess()) {
+                    File downloadedFile = findNewestDownload(folder, downloadStartedAt);
+                    String publicPath = publishToPublicDownloads(downloadedFile);
                     JSObject result = new JSObject();
                     result.put("success", true);
                     result.put("output", response.getOutput());
                     result.put("folder", folder.getAbsolutePath());
+                    result.put("fileName", downloadedFile.getName());
+                    result.put("filePath", publicPath);
+                    result.put("publicDownload", Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q);
                     call.resolve(result);
                 } else {
                     String detail = response == null ? "No response from yt-dlp" : response.getErrorOutput();
