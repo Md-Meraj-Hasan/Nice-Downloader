@@ -212,7 +212,7 @@ function showFormatChoices(info) {
   $("#formatSubtitle").textContent = (info.uploader ? info.uploader + " · " : "") +
     (duration ? Math.floor(duration / 60) + ":" + String(Math.floor(duration % 60)).padStart(2, "0") : "Available formats");
   const thumb = $("#formatThumbnail");
-  if (info.thumbnail && /^https?:\\/\\//i.test(info.thumbnail)) {
+  if (info.thumbnail && info.thumbnail.startsWith("https://")) {
     thumb.src = info.thumbnail; thumb.hidden = false; $("#formatThumbnailFallback").hidden = true;
     thumb.onerror = () => { thumb.hidden = true; $("#formatThumbnailFallback").hidden = false; };
   } else { thumb.hidden = true; $("#formatThumbnailFallback").hidden = false; }
