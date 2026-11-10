@@ -36,8 +36,8 @@ if (!rootGradle.includes("org.jetbrains.kotlin:kotlin-gradle-plugin")) {
   fs.writeFileSync(rootGradlePath, rootGradle);
 }
 if (!gradle.includes("kotlin-android")) {
-  gradle = gradle.replace(/plugins\s*\{/, match => match + '\n    id "kotlin-android"');
-  if (!gradle.includes("kotlin-android")) throw new Error("App Gradle plugins block not found; cannot enable Kotlin safely");
+  // Capacitor's generated app module uses the legacy apply-plugin style.
+  gradle = 'apply plugin: "kotlin-android"\\n' + gradle;
   fs.writeFileSync(gradlePath, gradle);
 }
 const routerSource = fs.readFileSync("native/NativePlatformRouter.kt", "utf8").replace("package __PACKAGE__", "package " + namespace);
