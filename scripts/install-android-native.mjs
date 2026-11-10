@@ -48,21 +48,23 @@ ensureManifestPermission('<uses-permission android:name="android.permission.INTE
 // Legacy file-path writes are used only on Android 9 and below. Android 10+ uses MediaStore.
 ensureManifestPermission('<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />', "android.permission.WRITE_EXTERNAL_STORAGE");
 // Harden app data and transport defaults. The downloader needs HTTPS only.
-const applicationTag = manifest.match(/<application\\b[^>]*>/);
-if (!applicationTag) throw new Error("AndroidManifest application tag not found for security hardening.");
-let hardenedApplicationTag = applicationTag[0];
-if (!/\\bandroid:allowBackup=/.test(hardenedApplicationTag)) {
+const applicationStart = manifest.indexOf("<application");
+if (applicationStart < 0) throw new Error("AndroidManifest application tag not found for security hardening.");
+const applicationEnd = manifest.indexOf(">", applicationStart);
+if (applicationEnd < 0) throw new Error("AndroidManifest application tag is malformed.");
+let hardenedApplicationTag = manifest.slice(applicationStart, applicationEnd + 1);
+if (!hardenedApplicationTag.includes("android:allowBackup=")) {
   hardenedApplicationTag = hardenedApplicationTag.replace("<application", '<application android:allowBackup="false"');
 } else {
   hardenedApplicationTag = hardenedApplicationTag.replace(/android:allowBackup="[^"]*"/, 'android:allowBackup="false"');
 }
-if (!/\\bandroid:usesCleartextTraffic=/.test(hardenedApplicationTag)) {
+if (!hardenedApplicationTag.includes("android:usesCleartextTraffic=")) {
   hardenedApplicationTag = hardenedApplicationTag.replace("<application", '<application android:usesCleartextTraffic="false"');
 } else {
   hardenedApplicationTag = hardenedApplicationTag.replace(/android:usesCleartextTraffic="[^"]*"/, 'android:usesCleartextTraffic="false"');
 }
-manifest = manifest.replace(applicationTag[0], hardenedApplicationTag);
-fs.writeFileSync(manifestPath, manifest);
+manifest = manifest.slice(0, applicationStart) + hardenedApplicationTag + manifest.slice(applicationEnd + 1);
+
 
 const javaMain = path.join(javaDir, "MainActivity.java");
 const ktMain = path.join(javaDir, "MainActivity.kt");
