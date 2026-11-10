@@ -27,17 +27,37 @@ jobs:
         run: node scripts/install-android-native.mjs
       - name: Sync Capacitor
         run: npx cap sync android
-      - name: Build debug APK (size baseline)
+      - name: Build debug and optimized release APKs
         working-directory: android
-        run: ./gradlew assembleDebug
-      - name: Report APK size
+        run: ./gradlew assembleDebug assembleRelease
+      - name: Audit APK contents and report sizes
+        shell: bash
         run: |
-          ls -lh android/app/build/outputs/apk/debug/app-debug.apk
-          du -h android/app/build/outputs/apk/debug/app-debug.apk
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | sort -nr | head -20
-      - name: Upload APK
+          set -euo pipefail
+          for apk in android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/release/app-release-unsigned.apk; do
+            test -f "$apk"
+            echo "=== $apk ==="
+            ls -lh "$apk"
+            du -h "$apk"
+            if unzip -Z1 "$apk" | grep -Eiq '(^|/)(chaquopy|python[0-9.]*|yt.?dlp|ffmpeg)(/|\.|$)|libpython'; then
+              echo "Forbidden Python/yt-dlp/FFmpeg runtime file detected"
+              exit 1
+            fi
+            if unzip -p "$apk" 'classes*.dex' 'assets/*' 2>/dev/null | strings | grep -Eiq 'com\.chaquo|chaquopy|libpython[0-9.]*|yt.?dlp|ffmpeg'; then
+              echo "Forbidden Python/yt-dlp/FFmpeg runtime reference detected"
+              exit 1
+            fi
+          done
+          echo "Runtime audit passed: no bundled Python, Chaquopy, yt-dlp, or FFmpeg runtime markers."
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: Nice-Downloader-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: Upload optimized release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nice-Downloader-release-apk
+          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
