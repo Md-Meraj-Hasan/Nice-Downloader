@@ -164,8 +164,8 @@ class YouTubeDownloadPlugin : Plugin() {
         val title = call.getString("title")?.trim().orEmpty().ifBlank { "YouTube video" }
         val extension = call.getString("extension")?.lowercase(Locale.ROOT)?.takeIf { it.matches(Regex("[a-z0-9]{2,5}")) } ?: "mp4"
         val requestedMime = call.getString("mimeType")?.substringBefore(";")?.trim()?.lowercase(Locale.ROOT)
-        val mimeType = requestedMime?.takeIf { it in setOf("video/mp4", "video/webm", "audio/mp4", "audio/webm") }
-            ?: if (extension == "m4a") "audio/mp4" else if (extension == "webm") "video/webm" else "video/mp4"
+        val mimeType = requestedMime?.takeIf { it in setOf("video/mp4", "video/webm") }
+            ?: if (extension == "webm") "video/webm" else "video/mp4"
         val uri = runCatching { Uri.parse(raw) }.getOrNull()
         if (uri == null || uri.scheme != "https" || uri.host?.lowercase(Locale.ROOT)?.endsWith(".googlevideo.com") != true) {
             call.reject("Invalid YouTube media stream URL.")
@@ -174,16 +174,81 @@ class YouTubeDownloadPlugin : Plugin() {
         thread(name = "NiceDownloader-stream") {
             var connection: HttpURLConnection? = null
             var destination: Uri? = null
+            var legacyDestination: java.io.File? = null
             try {
+                // Internal private staging keeps incomplete data out of the public Downloads folder.
+                val tempDirectory = java.io.File(getContext().filesDir, "NiceDownloaderTemp")
+                if (!tempDirectory.exists() && !tempDirectory.mkdirs()) throw IllegalStateException("Could not create internal temporary folder")
+                val digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(raw.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+                val tempFile = java.io.File(tempDirectory, "$digest.$extension.part")
+                var offset = if (tempFile.isFile) tempFile.length() else 0L
+
                 connection = URL(raw).openConnection() as HttpURLConnection
                 connection.connectTimeout = 20000
-                connection.readTimeout = 30000
+                connection.readTimeout = 45000
                 connection.instanceFollowRedirects = true
                 connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                connection.setRequestProperty("Accept-Encoding", "identity")
+                if (offset > 0L) connection.setRequestProperty("Range", "bytes=$offset-")
                 connection.connect()
-                val code = connection.responseCode
+
+                var code = connection.responseCode
+                if (offset > 0L && (code == HttpURLConnection.HTTP_OK || code == 416)) {
+                    // If Range is ignored or stale, restart cleanly rather than append duplicate bytes.
+                    connection.disconnect()
+                    connection = URL(raw).openConnection() as HttpURLConnection
+                    connection.connectTimeout = 20000
+                    connection.readTimeout = 45000
+                    connection.instanceFollowRedirects = true
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                    connection.setRequestProperty("Accept-Encoding", "identity")
+                    connection.connect()
+                    code = connection.responseCode
+                    offset = 0L
+                    tempFile.delete()
+                }
                 if (code !in 200..299) throw IllegalStateException("Media server returned HTTP $code")
-                val total = connection.contentLengthLong
+
+                val contentRange = connection.getHeaderField("Content-Range")
+                val rangeTotal = Regex("/(\\d+)$").find(contentRange.orEmpty())?.groupValues?.get(1)?.toLongOrNull()
+                val responseLength = connection.contentLengthLong
+                val expectedTotal = rangeTotal ?: if (responseLength >= 0L) offset + responseLength else -1L
+                val append = offset > 0L && code == HttpURLConnection.HTTP_PARTIAL
+                if (!append) offset = 0L
+
+                BufferedInputStream(connection.inputStream).use { input ->
+                    java.io.FileOutputStream(tempFile, append).use { fileOutput ->
+                        BufferedOutputStream(fileOutput, 256 * 1024).use { out ->
+                            val buffer = ByteArray(256 * 1024)
+                            var done = offset
+                            var lastProgress = -1
+                            while (true) {
+                                val count = input.read(buffer)
+                                if (count < 0) break
+                                out.write(buffer, 0, count)
+                                done += count
+                                val progress = if (expectedTotal > 0L) (done * 100.0 / expectedTotal).toInt().coerceIn(0, 99) else 0
+                                if (progress != lastProgress) {
+                                    lastProgress = progress
+                                    notifyListeners("downloadProgress", JSObject().apply {
+                                        put("progress", progress)
+                                        put("etaSeconds", 0)
+                                        put("message", "Downloading to temporary storage…")
+                                    })
+                                }
+                            }
+                            out.flush()
+                            fileOutput.fd.sync()
+                        }
+                    }
+                }
+
+                if (expectedTotal > 0L && tempFile.length() != expectedTotal) {
+                    throw IllegalStateException("Download incomplete (\${tempFile.length()} of $expectedTotal bytes). Retry to continue.")
+                }
+                if (!tempFile.isFile || tempFile.length() <= 0L) throw IllegalStateException("The server returned an empty video file.")
+
                 val safeName = title.replace(Regex("[\\\\/:*?\"<>|\\r\\n]"), "_").trim().take(100).ifBlank { "YouTube video" } + "." + extension
                 val values = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
@@ -193,49 +258,53 @@ class YouTubeDownloadPlugin : Plugin() {
                         put(MediaStore.MediaColumns.IS_PENDING, 1)
                     }
                 }
-                destination = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    getContext().contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    destination = getContext().contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                        ?: throw IllegalStateException("Could not create public Downloads entry")
+                    getContext().contentResolver.openOutputStream(destination!!, "w")?.use { output ->
+                        java.io.FileInputStream(tempFile).use { input ->
+                            val buffer = ByteArray(256 * 1024)
+                            while (true) {
+                                val count = input.read(buffer)
+                                if (count < 0) break
+                                output.write(buffer, 0, count)
+                            }
+                            output.flush()
+                        }
+                    } ?: throw IllegalStateException("Could not open public Downloads file")
+                    getContext().contentResolver.update(destination!!, ContentValues().apply {
+                        put(MediaStore.MediaColumns.IS_PENDING, 0)
+                    }, null, null)
                 } else {
                     val folder = java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "NiceDownloader")
-                    if (!folder.exists()) folder.mkdirs()
-                    val file = java.io.File(folder, safeName)
-                    Uri.fromFile(file)
-                } ?: throw IllegalStateException("Could not create destination file")
-                val output = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) getContext().contentResolver.openOutputStream(destination!!) else java.io.FileOutputStream(java.io.File(destination!!.path!!))
-                if (output == null) throw IllegalStateException("Could not open destination file")
-                BufferedInputStream(connection.inputStream).use { input ->
-                    BufferedOutputStream(output).use { out ->
-                        val buffer = ByteArray(64 * 1024)
-                        var done = 0L
-                        while (true) {
-                            val count = input.read(buffer)
-                            if (count < 0) break
-                            out.write(buffer, 0, count)
-                            done += count
-                            val progress = if (total > 0) (done * 100.0 / total).toInt().coerceIn(0, 99) else 0
-                            val event = JSObject().apply {
-                                put("progress", progress)
-                                put("etaSeconds", 0)
-                                put("message", "Downloading…")
+                    if (!folder.exists() && !folder.mkdirs()) throw IllegalStateException("Could not create public Downloads folder")
+                    legacyDestination = java.io.File(folder, safeName)
+                    java.io.FileInputStream(tempFile).use { input ->
+                        java.io.FileOutputStream(legacyDestination!!).use { output ->
+                            val buffer = ByteArray(256 * 1024)
+                            while (true) {
+                                val count = input.read(buffer)
+                                if (count < 0) break
+                                output.write(buffer, 0, count)
                             }
-                            notifyListeners("downloadProgress", event)
+                            output.fd.sync()
                         }
                     }
                 }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    getContext().contentResolver.update(destination!!, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
-                }
-                val result = JSObject().apply {
+                if (!tempFile.delete()) tempFile.deleteOnExit()
+                call.resolve(JSObject().apply {
                     put("success", true)
                     put("publicDownload", true)
                     put("fileName", safeName)
                     put("filePath", "Download/NiceDownloader/$safeName")
                     put("folder", "Download/NiceDownloader")
-                }
-                call.resolve(result)
+                    put("resumed", append)
+                })
             } catch (error: Exception) {
                 destination?.let { runCatching { getContext().contentResolver.delete(it, null, null) } }
-                call.reject("Download failed: ${error.message ?: "network error"}")
+                legacyDestination?.let { runCatching { it.delete() } }
+                call.reject("Download failed: \${error.message ?: "network error"}. Incomplete data is kept privately for retry.")
             } finally {
                 connection?.disconnect()
             }
