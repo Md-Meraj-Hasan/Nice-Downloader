@@ -8,7 +8,6 @@ import android.webkit.MimeTypeMap;
 import java.io.FileInputStream;
 import java.io.OutputStream;
 import android.content.Intent;
-import androidx.activity.result.ActivityResult;
 import java.io.InputStream;
 import android.os.Environment;
 import com.getcapacitor.JSObject;
