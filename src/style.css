@@ -45,3 +45,65 @@
 .settings-info{margin-top:10px}
 .settings-info>p{margin-top:10px}
 @media(max-height:650px){.settings-page{justify-content:flex-start}.settings-card{padding:12px}.storage-location{margin-top:10px;padding:10px}}
+
+
+/* Format picker: isolated, scrollable mobile dialog */
+.format-modal-backdrop[hidden]{display:none!important}
+.format-modal-backdrop{
+  position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;
+  padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
+  background:rgba(4,4,16,.86);backdrop-filter:blur(10px);overflow-y:auto;
+}
+.format-modal{
+  position:relative;width:min(100%,520px);max-height:100%;min-height:0;overflow-y:auto;
+  border:1px solid #7051ad;border-radius:22px;padding:18px;
+  background:linear-gradient(155deg,#21183d 0%,#111326 72%);color:#f7f3ff;
+  box-shadow:0 24px 80px #000b,0 0 35px #7136c833;
+  scrollbar-width:thin;overscroll-behavior:contain;
+}
+.format-close{
+  position:absolute;right:12px;top:12px;z-index:2;width:34px;height:34px;
+  border:1px solid #ffffff24;border-radius:50%;background:#ffffff12;color:#fff;
+  font-size:23px;line-height:1;display:grid;place-items:center;
+}
+.format-preview{
+  width:100%;height:clamp(110px,24vh,190px);overflow:hidden;border-radius:14px;
+  background:linear-gradient(135deg,#17285a,#44206b);display:grid;place-items:center;
+}
+.format-preview img{width:100%;height:100%;object-fit:cover}
+#formatThumbnailFallback{font-size:36px;color:#d8c5ff}
+.format-meta{padding:13px 2px 8px}
+.format-meta h2{font-size:clamp(16px,4.5vw,21px);line-height:1.25;margin:0 38px 5px 0;overflow-wrap:anywhere}
+.format-meta p{font-size:11px;line-height:1.4;color:#aaa0c6;margin:0}
+.format-options{display:grid;gap:8px;margin:9px 0 12px}
+.format-choice{
+  min-height:56px;display:flex;align-items:center;gap:12px;padding:10px 12px;
+  border:1px solid #ffffff20;border-radius:12px;background:#0d1024;
+  cursor:pointer;transition:border-color .15s,background .15s;
+}
+.format-choice:has(input:checked){border-color:#a65aff;background:linear-gradient(100deg,#43236a88,#252052aa);box-shadow:inset 0 0 0 1px #a65aff44}
+.format-choice input{width:18px;height:18px;flex:0 0 18px;accent-color:#b34cff}
+.format-choice span{display:flex;flex-direction:column;gap:4px;min-width:0}
+.format-choice b{font-size:14px;color:#fff}
+.format-choice small{font-size:10px;color:#aaa1c4;line-height:1.3}
+.format-unavailable{padding:13px;border:1px solid #8b5a3e;border-radius:12px;background:#3b241f;color:#ffd1ae;font-size:11px;line-height:1.45}
+.format-start{position:sticky;bottom:0;margin-top:4px;min-height:46px}
+.format-note{margin:9px 0 0;text-align:center;color:#8e86a5;font-size:9px;line-height:1.4}
+
+/* Keep the home screen content in its own scroll area on short phones */
+.stage{align-items:stretch}
+.page-home,.page#page-home{justify-content:flex-start;overflow-y:auto;overflow-x:hidden;padding:4px 2px 18px;scrollbar-width:thin;overscroll-behavior:contain}
+#page-home .hero-banner{flex:0 0 auto}
+#page-home .section-heading{margin-top:3px}
+#page-home .download-card{margin-bottom:6px}
+#page-home .status{overflow-wrap:anywhere}
+#page-home .progress-wrap{width:100%}
+@media(max-height:760px){
+  #page-home{gap:10px}
+  #page-home .hero-banner{height:132px;min-height:122px}
+}
+@media(max-width:420px){
+  .format-modal{padding:14px;border-radius:18px}
+  .format-preview{height:clamp(100px,20vh,150px)}
+  .format-choice{min-height:53px;padding:9px 10px}
+}
