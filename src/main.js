@@ -123,6 +123,18 @@ app.innerHTML = `
 
   </main>
 
+  <div class="format-modal-backdrop" id="playlistModal" hidden>
+    <section class="format-modal playlist-modal" role="dialog" aria-modal="true" aria-labelledby="playlistTitle">
+      <button type="button" class="format-close" id="playlistClose" aria-label="Close">×</button>
+      <div class="format-meta"><h2 id="playlistTitle">YouTube playlist</h2><p id="playlistSubtitle">Videos will download one by one.</p></div>
+      <label class="playlist-quality-label" for="playlistQuality">VIDEO QUALITY</label>
+      <select id="playlistQuality" class="playlist-quality"><option value="best">Best available</option><option value="1080">Up to 1080p</option><option value="720">Up to 720p</option><option value="480">Up to 480p</option><option value="360">Up to 360p</option><option value="240">Up to 240p</option></select>
+      <div id="playlistItems" class="playlist-items"></div>
+      <div class="playlist-progress"><div class="progress-head"><span id="playlistProgressLabel">Ready</span><b id="playlistProgressValue">0/0</b></div><div class="progress-track"><div id="playlistProgressBar"></div></div></div>
+      <button type="button" class="primary" id="playlistStart">Download playlist one by one</button>
+      <p class="format-note">Videos download sequentially. Each video uses the selected maximum quality or the nearest lower available MP4 quality.</p>
+    </section>
+  </div>
   <div class="format-modal-backdrop" id="formatModal" hidden>
     <section class="format-modal" role="dialog" aria-modal="true" aria-labelledby="formatTitle">
       <button type="button" class="format-close" id="formatClose" aria-label="Close">×</button>
@@ -158,6 +170,43 @@ function extractYouTubeVideoId(value) {
   if (url.pathname === "/watch") return url.searchParams.get("v") || "";
   const parts = url.pathname.split("/").filter(Boolean);
   return ["shorts", "embed", "live"].includes(parts[0]) ? (parts[1] || "") : "";
+}
+
+function extractYouTubePlaylistId(value) {
+  const url = validWebUrl(value);
+  return url ? (url.searchParams.get("list") || "") : "";
+}
+
+async function readYouTubePlaylist(playlistUrl) {
+  const playlistId = extractYouTubePlaylistId(playlistUrl);
+  if (!playlistId) throw new Error("Playlist ID was not found in this link.");
+  let lastError = null;
+  for (const clientType of ["WEB", "ANDROID"]) {
+    try {
+      const youtube = await getYouTubeClient(clientType);
+      const playlist = await youtube.getPlaylist(playlistId);
+      const videos = [];
+      const seen = new Set();
+      const addItems = items => {
+        for (const item of items || []) {
+          const id = item.video_id || item.id || item.endpoint?.payload?.videoId;
+          if (!id || seen.has(id) || item.is_unavailable || item.is_private) continue;
+          seen.add(id);
+          videos.push({ videoId: id, title: item.title?.text || item.title || "YouTube video" });
+        }
+      };
+      addItems(playlist.videos);
+      let pages = 0;
+      while (playlist.has_continuation && pages < 50 && videos.length < 500) {
+        const next = await playlist.getContinuation();
+        addItems(Array.isArray(next) ? next : (next?.videos || next?.items || []));
+        pages += 1;
+      }
+      if (!videos.length) throw new Error("No accessible videos were found in this playlist.");
+      return { playlistId, title: playlist.info?.title?.text || playlist.info?.title || "YouTube playlist", videos };
+    } catch (error) { lastError = error; }
+  }
+  throw new Error("Could not read playlist: " + (lastError?.message || "YouTube request failed"));
 }
 
 async function readYouTubeDetails(videoUrl) {
@@ -310,6 +359,7 @@ let formatLookupInProgress = false;
 let loadedFormatsForUrl = "";
 
 async function previewYouTubeLink(value) {
+  if (extractYouTubePlaylistId(value)) { await previewYouTubePlaylist(value); return; }
   const url = validWebUrl(value);
   if (!url) {
     status.textContent = "Please paste a valid YouTube video link.";
@@ -343,6 +393,106 @@ async function previewYouTubeLink(value) {
     button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Download now';
   }
 }
+
+let activePlaylist = null;
+let playlistRunning = false;
+
+async function previewYouTubePlaylist(value) {
+  if (!Capacitor.isNativePlatform()) { status.textContent = "Playlist downloading is available in the Android APK."; return; }
+  if (playlistRunning || formatLookupInProgress) return;
+  formatLookupInProgress = true;
+  button.disabled = true;
+  button.textContent = "Loading playlist…";
+  status.textContent = "Reading playlist videos…";
+  try {
+    activePlaylist = await readYouTubePlaylist(value);
+    renderPlaylistQueue();
+    $("#playlistTitle").textContent = activePlaylist.title;
+    $("#playlistSubtitle").textContent = activePlaylist.videos.length + " videos · sequential download";
+    $("#playlistModal").hidden = false;
+    status.textContent = "Playlist loaded. Choose maximum quality and start.";
+  } catch (error) {
+    status.textContent = error?.message || "Could not load playlist.";
+  } finally {
+    formatLookupInProgress = false;
+    button.disabled = false;
+    button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Download now';
+  }
+}
+
+function renderPlaylistQueue() {
+  const host = $("#playlistItems");
+  host.innerHTML = "";
+  (activePlaylist?.videos || []).forEach((video, index) => {
+    const row = document.createElement("div");
+    row.className = "playlist-item";
+    row.innerHTML = '<span class="playlist-index">' + (index + 1) + '</span><span class="playlist-video-title"></span><span class="playlist-video-state">Queued</span>';
+    row.querySelector(".playlist-video-title").textContent = video.title;
+    host.append(row);
+  });
+  $("#playlistProgressValue").textContent = "0/" + (activePlaylist?.videos.length || 0);
+  $("#playlistProgressBar").style.width = "0%";
+  $("#playlistProgressLabel").textContent = "Ready";
+  $("#playlistStart").disabled = false;
+  $("#playlistStart").textContent = "Download playlist one by one";
+}
+
+function selectPlaylistFormat(formats, requested) {
+  const available = (formats || []).filter(f => f.hasVideo && f.hasAudio && f.url && f.mimeType === "video/mp4").sort((a,b) => a.height-b.height);
+  if (!available.length) return null;
+  if (requested === "best") return available[available.length - 1];
+  const maxHeight = Number(requested);
+  const under = available.filter(f => f.height <= maxHeight);
+  return under[under.length - 1] || available[0];
+}
+
+async function runPlaylistDownloads() {
+  if (!activePlaylist || playlistRunning) return;
+  playlistRunning = true;
+  const start = $("#playlistStart");
+  start.disabled = true;
+  start.textContent = "Downloading…";
+  const videos = activePlaylist.videos;
+  const requested = $("#playlistQuality").value;
+  let completed = 0, failed = 0;
+  for (let i = 0; i < videos.length; i++) {
+    const video = videos[i];
+    const row = $("#playlistItems").children[i];
+    const state = row?.querySelector(".playlist-video-state");
+    if (state) state.textContent = "Loading…";
+    $("#playlistProgressLabel").textContent = "Video " + (i+1) + " of " + videos.length + ": loading";
+    try {
+      const info = await readYouTubeDetails("https://www.youtube.com/watch?v=" + encodeURIComponent(video.videoId));
+      const format = selectPlaylistFormat(info.formats, requested);
+      if (!format) throw new Error("No compatible MP4 format");
+      if (row) row.querySelector(".playlist-video-title").textContent = info.title || video.title;
+      if (state) state.textContent = "Downloading " + (format.quality || format.height + "p");
+      progressWrap.hidden = false;
+      progressBar.style.width = "0%";
+      progressValue.textContent = "0%";
+      progressLabel.textContent = "Playlist " + (i+1) + "/" + videos.length;
+      await YtDlp.downloadStream({streamUrl:format.url,title:info.title || video.title,extension:"mp4",mimeType:"video/mp4"});
+      completed++;
+      if (state) state.textContent = "✓ Saved";
+    } catch (error) {
+      failed++;
+      if (state) state.textContent = "Failed";
+      if (row) row.title = error?.message || String(error);
+    }
+    const done = completed + failed;
+    $("#playlistProgressValue").textContent = done + "/" + videos.length;
+    $("#playlistProgressBar").style.width = (done * 100 / videos.length) + "%";
+    $("#playlistProgressLabel").textContent = "Downloaded " + completed + " · Failed " + failed;
+  }
+  playlistRunning = false;
+  start.disabled = false;
+  start.textContent = "Playlist finished";
+  status.textContent = "Playlist finished: " + completed + " downloaded, " + failed + " failed.";
+  downloadSessions += completed;
+  updateDownloadSummary(failed ? "Playlist partial" : "Playlist complete");
+}
+$("#playlistClose").addEventListener("click", () => { if (!playlistRunning) $("#playlistModal").hidden = true; });
+$("#playlistStart").addEventListener("click", runPlaylistDownloads);
 
 $("#pasteBtn").addEventListener("click", async () => {
   try {
