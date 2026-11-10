@@ -104,8 +104,21 @@ let innertubePromise = null;
 let activeVideoTitle = "YouTube video";
 let activeFormat = null;
 
+async function nativeYouTubeFetch(input, init = {}) {
+  const request = input instanceof Request ? input : null;
+  const url = request ? request.url : String(input);
+  const method = String(init.method || request?.method || "GET").toUpperCase();
+  const headers = {};
+  const sourceHeaders = new Headers(init.headers || request?.headers || {});
+  sourceHeaders.forEach((value, key) => { headers[key] = value; });
+  let body = init.body;
+  if (body == null && request && method !== "GET" && method !== "HEAD") body = await request.text();
+  const result = await YtDlp.httpRequest({ url, method, headers, body: typeof body === "string" ? body : "" });
+  return new Response(result.body || "", { status: Number(result.status) || 200, headers: result.headers || {} });
+}
+
 async function getYouTubeClient() {
-  if (!innertubePromise) innertubePromise = Innertube.create();
+  if (!innertubePromise) innertubePromise = Innertube.create({ fetch: nativeYouTubeFetch, client_type: "ANDROID", device_category: "MOBILE", lang: "en", location: "SA" });
   return innertubePromise;
 }
 
