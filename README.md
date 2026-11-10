@@ -11,14 +11,15 @@ A lightweight, ad-free Android YouTube downloader.
 ## Technology
 - Vite + JavaScript interface
 - Capacitor 7 Android shell
-- YouTube.js (MIT) for public YouTube stream information
+- Native Kotlin HTTPS bridge for permitted metadata and authorized direct media downloads
 - Minimal Kotlin Android bridge for downloading selected direct media streams
 - GitHub Actions builds the APK
 
 ## Features
 - Existing premium interface, quality selection, progress display, and Downloads tab retained.
-- Available combined audio/video streams are offered as video choices.
-- Audio-only stream is offered when YouTube provides one.
+- Video-only interface; no MP3/audio conversion or download option.
+- YouTube oEmbed supplies public title/channel/thumbnail metadata only; it does not expose downloadable media streams.
+- Native Kotlin saves authorized direct video streams to Download/NiceDownloader.
 - Files are saved to Download/NiceDownloader on supported Android versions.
 
 ## Size policy
@@ -35,4 +36,4 @@ cd android && ./gradlew assembleDebug
 ```
 
 ## License notes
-YouTube.js is MIT-licensed. Capacitor and transitive dependencies retain their respective licenses; consult their notices before redistribution.
+Capacitor and transitive dependencies retain their respective licenses; consult their notices before redistribution.
