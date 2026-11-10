@@ -194,6 +194,12 @@ public class YtDlpPlugin extends Plugin {
             default: format = "best";
         }
 
+        Intent foregroundIntent = new Intent(getContext(), DownloadForegroundService.class);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            getContext().startForegroundService(foregroundIntent);
+        } else {
+            getContext().startService(foregroundIntent);
+        }
         new Thread(() -> {
             try {
                 synchronized (YtDlpPlugin.class) {
@@ -268,6 +274,8 @@ public class YtDlpPlugin extends Plugin {
                 call.reject("Downloader initialization failed: " + e.getMessage());
             } catch (Exception e) {
                 call.reject("Download failed: " + e.getMessage());
+            } finally {
+                try { getContext().stopService(foregroundIntent); } catch (Exception ignored) { }
             }
         }, "NiceDownloader-yt-dlp").start();
     }
