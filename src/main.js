@@ -64,17 +64,6 @@ app.innerHTML = `
         <button id="browserBtn" class="browser-fallback" hidden>Open link in Chrome / browser ↗</button>
         <div class="progress-wrap" id="progressWrap" hidden><div class="progress-head"><span id="progressLabel">Connecting…</span><b id="progressValue">0%</b></div><div class="progress-track"><div id="progressBar"></div></div></div>
       </div>
-
-      <div class="section-heading tools-heading"><div><span class="section-kicker">BUILT FOR EVERYDAY USE</span><h2>Quick tools</h2></div></div>
-      <div class="tools-grid">
-        <button type="button" class="tool-tile tile-video" data-tool="video"><span class="tool-icon">${icon("video")}</span><b>Video</b><small>Select video mode</small></button>
-        <button type="button" class="tool-tile tile-audio" data-tool="audio"><span class="tool-icon">${icon("music")}</span><b>Audio</b><small>Download audio only</small></button>
-        <div class="tool-tile tile-playlist" aria-disabled="true"><span class="tool-icon">${icon("playlist")}</span><b>Playlist</b><small>Coming soon</small></div>
-        <button type="button" class="tool-tile tile-quality" data-tool="quality"><span class="tool-icon">HD</span><b>HD quality</b><small>Select up to 1080p</small></button>
-        <div class="tool-tile tile-speed" aria-label="Download engine information"><span class="tool-icon">${icon("speed")}</span><b>Fast engine</b><small>Parallel download engine</small></div>
-        <div class="tool-tile tile-private" aria-label="Privacy information"><span class="tool-icon">${icon("shield")}</span><b>Private</b><small>Files stay on device</small></div>
-      </div>
-      <div class="platform-strip"><div class="platform-title"><b>Made for your links</b><small>Paste a supported URL to begin</small></div><div class="platform-symbols"><span class="platform-youtube">▶</span><span class="platform-video">${icon("video")}</span><span class="platform-music">${icon("music")}</span><span class="platform-more">•••</span></div></div>
     </section>
 
     <section class="page" id="page-downloads">
@@ -167,26 +156,6 @@ document.querySelectorAll("[data-tab]").forEach(item => item.addEventListener("c
 $("#themeBtn").addEventListener("click", toggleTheme);
 $("#settingsThemeBtn").addEventListener("click", toggleTheme);
 
-// Quick tools are functional shortcuts.
-document.querySelectorAll("[data-tool]").forEach(tile => {
-  tile.addEventListener("click", () => {
-    const quality = $("#quality");
-    if (tile.dataset.tool === "video") {
-      quality.value = "best";
-      status.textContent = "Video mode selected. Paste a supported video link and tap Download now.";
-      input.focus();
-    } else if (tile.dataset.tool === "audio") {
-      quality.value = "audio";
-      status.textContent = "Audio-only mode selected. Paste a supported media link and tap Download now.";
-      input.focus();
-    } else if (tile.dataset.tool === "quality") {
-      quality.value = "1080";
-      status.textContent = "HD quality selected: up to 1080p. Paste a link and tap Download now.";
-      quality.focus();
-    }
-    switchTab("home");
-  });
-});
 
 $("#importCookiesBtn").addEventListener("click", async () => {
   const cookieStatus = $("#cookieStatus");
