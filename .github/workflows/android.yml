@@ -1,7 +1,7 @@
 name: Android APK
 on:
   push:
-    branches: [main]
+    branches: [main, native-kotlin-migration]
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,7 +23,7 @@ jobs:
         run: npm run build
       - name: Generate Android project
         run: npx cap add android
-      - name: Install native yt-dlp integration
+      - name: Install Android native bridge
         run: node scripts/install-android-ytdlp.mjs
       - name: Sync Capacitor
         run: npx cap sync android
