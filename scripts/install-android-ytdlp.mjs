@@ -37,9 +37,9 @@ if (!rootGradle.includes("org.jetbrains.kotlin:kotlin-gradle-plugin")) {
 }
 if (!gradle.includes("kotlin-android")) {
   // Apply Kotlin after the Android application plugin is available.
-  const androidPlugin = /apply plugin:\s*['"]com\\.android\\.application['"]\\s*/;
+  const androidPlugin = /apply plugin:\s*['"]com\.android\.application['"]\s*/;
   if (!androidPlugin.test(gradle)) throw new Error("Android application plugin declaration not found");
-  gradle = gradle.replace(androidPlugin, match => match + '\\napply plugin: "kotlin-android"\\n');
+  gradle = gradle.replace(androidPlugin, match => match + '\napply plugin: "kotlin-android"\n');
   fs.writeFileSync(gradlePath, gradle);
 }
 const routerSource = fs.readFileSync("native/NativePlatformRouter.kt", "utf8").replace("package __PACKAGE__", "package " + namespace);
