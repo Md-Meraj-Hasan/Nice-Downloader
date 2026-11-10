@@ -126,13 +126,14 @@ async function readYouTubeDetails(videoUrl) {
       enable_session_cache: true
     });
     const youtube = await youtubeClientPromise;
-    const info = await youtube.getInfo(videoId);
+    const info = await youtube.getBasicInfo(videoId);
     const rawFormats = info.streaming_data?.formats || [];
     const formats = [];
+    let decipherFailures = 0;
     for (const format of rawFormats) {
       if (!format.has_video || !format.has_audio || !String(format.mime_type || "").toLowerCase().includes("video/mp4")) continue;
       let streamUrl = "";
-      try { streamUrl = await format.decipher(youtube.session.player); } catch { continue; }
+      try { streamUrl = format.url || await format.decipher(youtube.session.player); } catch { decipherFailures += 1; continue; }
       if (!streamUrl || !streamUrl.startsWith("https://")) continue;
       formats.push({
         url: streamUrl,
@@ -155,6 +156,7 @@ async function readYouTubeDetails(videoUrl) {
       thumbnail: thumbnails.length ? thumbnails[thumbnails.length - 1].url : "",
       duration: Number(basic.duration) || 0,
       formats,
+      decipherFailures,
       downloadable: formats.length > 0
     };
   } catch (error) {
