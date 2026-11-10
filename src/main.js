@@ -1,6 +1,5 @@
 import "./style.css";
 import { registerPlugin, Capacitor } from "@capacitor/core";
-import { Innertube } from "youtubei.js";
 
 const YtDlp = registerPlugin("YtDlp");
 const app = document.querySelector("#app");
@@ -100,59 +99,40 @@ const progressBar = $("#progressBar"), progressValue = $("#progressValue"), prog
 const downloadState = $("#downloadState");
 let progressListener = null;
 let downloadSessions = 0;
-let innertubePromise = null;
 let activeVideoTitle = "YouTube video";
 let activeFormat = null;
 
-async function nativeYouTubeFetch(input, init = {}) {
-  const request = input instanceof Request ? input : null;
-  const url = request ? request.url : String(input);
-  const method = String(init.method || request?.method || "GET").toUpperCase();
-  const headers = {};
-  const sourceHeaders = new Headers(init.headers || request?.headers || {});
-  sourceHeaders.forEach((value, key) => { headers[key] = value; });
-  let body = init.body;
-  if (body == null && request && method !== "GET" && method !== "HEAD") body = await request.text();
-  const result = await YtDlp.httpRequest({ url, method, headers, body: typeof body === "string" ? body : "" });
-  return new Response(result.body || "", { status: Number(result.status) || 200, headers: result.headers || {} });
+function extractYouTubeVideoId(value) {
+  const url = validWebUrl(value);
+  if (!url) return "";
+  const host = url.hostname.toLowerCase().replace(/^www\\./, "");
+  if (host === "youtu.be") return url.pathname.split("/").filter(Boolean)[0] || "";
+  if (url.pathname === "/watch") return url.searchParams.get("v") || "";
+  const parts = url.pathname.split("/").filter(Boolean);
+  return ["shorts", "embed", "live"].includes(parts[0]) ? (parts[1] || "") : "";
 }
 
-async function getYouTubeClient() {
-  if (!innertubePromise) innertubePromise = Innertube.create({ fetch: nativeYouTubeFetch, client_type: "ANDROID", device_category: "MOBILE", lang: "en", location: "SA" });
-  return innertubePromise;
-}
-
-async function readYouTubeFormats(videoUrl) {
-  const client = await getYouTubeClient();
-  const info = await client.getInfo(videoUrl);
-  const streaming = info.streaming_data;
-  if (!streaming) throw new Error("YouTube did not provide downloadable public streams for this video.");
-  const candidates = [...(streaming.formats || []), ...(streaming.adaptive_formats || [])];
-  const formats = [];
-  const seen = new Set();
-  for (const item of candidates) {
-    let streamUrl = item.url;
-    if (!streamUrl && typeof item.decipher === "function") {
-      try { streamUrl = await item.decipher(client.session.player); } catch { continue; }
-    }
-    if (!streamUrl || !/^https:\/\//i.test(streamUrl)) continue;
-    let host = ""; try { host = new URL(streamUrl).hostname.toLowerCase(); } catch { continue; }
-    if (!host.endsWith(".googlevideo.com")) continue;
-    const hasVideo = Boolean(item.has_video ?? item.quality_label ?? item.height);
-    const hasAudio = Boolean(item.has_audio);
-    const height = Number(item.height || String(item.quality_label || "").match(/\d+/)?.[0] || 0);
-    if (!hasVideo && !hasAudio) continue;
-    const mime = String(item.mime_type || item.mimeType || "video/mp4");
-    const ext = mime.includes("webm") ? "webm" : mime.includes("audio/mp4") ? "m4a" : "mp4";
-    const key = hasVideo ? "v:" + height + ":" + ext : "a:" + ext;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    formats.push({ formatId: String(item.itag || formats.length), height, ext, mimeType: String(mime).split(";")[0].trim().toLowerCase(), filesize: Number(item.content_length || item.contentLength || 0), url: streamUrl, hasVideo, hasAudio });
+async function readYouTubeDetails(videoUrl) {
+  const videoId = extractYouTubeVideoId(videoUrl);
+  if (!videoId) throw new Error("Unsupported YouTube video link.");
+  const canonicalUrl = "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId);
+  const endpoint = "https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(canonicalUrl);
+  const response = await YtDlp.httpRequest({ url: endpoint, method: "GET", headers: {}, body: "" });
+  let data;
+  try { data = JSON.parse(response.body || "{}"); }
+  catch { throw new Error("YouTube returned an invalid oEmbed response."); }
+  if (Number(response.status) < 200 || Number(response.status) >= 300) {
+    throw new Error("YouTube oEmbed request failed (HTTP " + response.status + "). The video may be private, unavailable, or unsupported.");
   }
-  const video = formats.filter(f => f.hasVideo && f.hasAudio).sort((a,b) => b.height-a.height);
-  const audio = formats.filter(f => !f.hasVideo && f.hasAudio);
-  const title = info.basic_info?.title || info.primary_info?.title?.text || info.title || "YouTube video";
-  return { title, uploader: info.basic_info?.author || "", duration: info.basic_info?.duration || 0, thumbnail: info.basic_info?.thumbnail?.[0]?.url || "", formats: [...video, ...audio] };
+  return {
+    videoId,
+    title: data.title || "YouTube video",
+    uploader: data.author_name || "",
+    thumbnail: data.thumbnail_url || "",
+    duration: 0,
+    formats: [],
+    downloadable: false
+  };
 }
 
 function switchTab(tab) {
@@ -241,19 +221,19 @@ async function previewYouTubeLink(value) {
     return;
   }
   if (formatLookupInProgress) return;
-  if (loadedFormatsForUrl === url.href && activeFormat?.url) {
+  if (loadedFormatsForUrl === url.href) {
     $("#formatModal").hidden = false;
     return;
   }
   formatLookupInProgress = true;
-  status.textContent = "Loading video thumbnail and available formats…";
+  status.textContent = "Loading YouTube video details…";
   button.disabled = true;
   button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Loading video…';
   try {
-    const info = await readYouTubeFormats(url.href);
+    const info = await readYouTubeDetails(url.href);
     showFormatChoices(info);
     loadedFormatsForUrl = url.href;
-    status.textContent = "Video ready. Choose quality or Audio only.";
+    status.textContent = "Video details loaded. Official preview does not provide download streams.";
   } catch (error) {
     loadedFormatsForUrl = "";
     activeFormat = null;
@@ -349,7 +329,7 @@ function showFormatChoices(info) {
     thumb.onerror = () => { thumb.hidden = true; $("#formatThumbnailFallback").hidden = false; };
   } else { thumb.hidden = true; $("#formatThumbnailFallback").hidden = false; }
   const list = $("#formatOptions"); list.innerHTML = "";
-  const formats = Array.isArray(info.formats) ? info.formats : [];
+  const formats = [];
   const videos = formats.filter(f => f.hasVideo).sort((a,b) => b.height-a.height);
   videos.forEach((item, index) => {
     const label = document.createElement("label"); label.className = "format-choice";
@@ -370,7 +350,8 @@ function showFormatChoices(info) {
   }
   activeFormat = videos[0] || audio || null;
   selectedFormat = videos.length ? "video:0" : "audio";
-  $("#formatStart").disabled = !activeFormat;
+  $("#formatStart").disabled = true;
+  $("#formatStart").textContent = "Download not provided by oEmbed";
   $("#formatModal").hidden = false;
 }
 button.addEventListener("click", async () => {
