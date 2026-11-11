@@ -173,8 +173,18 @@ function extractYouTubeVideoId(value) {
 }
 
 function extractYouTubePlaylistId(value) {
-  const url = validWebUrl(value);
-  return url ? (url.searchParams.get("list") || "") : "";
+  const raw = String(value || "").trim();
+  try {
+    const url = new URL(raw);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const isYouTube = host === "youtube.com" || host.endsWith(".youtube.com") || host === "youtu.be";
+    if (isYouTube) {
+      const id = url.searchParams.get("list") || url.searchParams.get("playlist") || "";
+      if (id) return id.trim();
+    }
+  } catch {}
+  const match = raw.match(/[?&]list=([A-Za-z0-9_-]+)/i);
+  return match ? match[1] : "";
 }
 
 async function readYouTubePlaylist(playlistUrl) {
@@ -257,7 +267,15 @@ async function readYouTubeDetails(videoUrl) {
         bestInfo = { info, youtube, clientType };
       }
       totalDecipherFailures += decipherFailures;
-      if (formats.length) break;
+      // Try all client profiles because progressive MP4 quality can differ by profile.
+      if (formats.length) {
+        const known = new Set(bestFormats.map(item => item.url));
+        for (const item of formats) if (!known.has(item.url)) bestFormats.push(item);
+        bestFormats.sort((a, b) => b.height - a.height);
+        if (!bestInfo || formats.length > (bestInfo.formatCount || 0)) {
+          bestInfo = { info, youtube, clientType, formatCount: formats.length };
+        }
+      }
     } catch (error) {
       lastError = error;
     }
@@ -555,6 +573,9 @@ async function startSelectedDownload() {
   } finally {
     button.disabled = false;
     button.innerHTML = '<span class="primary-icon">' + icon("download") + '</span> Download now';
+    loadedFormatsForUrl = "";
+    activeFormat = null;
+    selectedFormat = "best";
   }}
 
 let selectedFormat = "best";
