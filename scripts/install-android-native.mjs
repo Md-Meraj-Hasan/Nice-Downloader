@@ -65,7 +65,7 @@ const serviceTag = '<service android:name="' + namespace + '.YouTubeDownloadServ
 if (!manifest.includes(namespace + '.YouTubeDownloadService')) {
   const closeApplication = manifest.indexOf("</application>");
   if (closeApplication < 0) throw new Error("AndroidManifest application closing tag not found.");
-  manifest = manifest.slice(0, closeApplication) + "        " + serviceTag + "\\n    " + manifest.slice(closeApplication);
+  manifest = manifest.slice(0, closeApplication) + "        " + serviceTag + "\n    " + manifest.slice(closeApplication);
 }
 
 // Harden app data and transport defaults. The downloader needs HTTPS only.
