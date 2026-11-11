@@ -219,10 +219,24 @@ async function readYouTubePlaylist(playlistUrl) {
       const seen = new Set();
       const addItems = items => {
         for (const item of items || []) {
-          const id = item.video_id || item.id || item.endpoint?.payload?.videoId;
+          // YouTube has started returning LockupView nodes for playlist videos.
+          // Older nodes expose video_id/id; LockupView exposes content_id.
+          const id = item.video_id || item.content_id || item.id ||
+            item.endpoint?.payload?.videoId ||
+            item.navigation_endpoint?.payload?.videoId ||
+            item.navigationEndpoint?.payload?.videoId;
           if (!id || seen.has(id) || item.is_unavailable || item.is_private) continue;
+
+          const rawTitle = item.title || item.metadata?.title ||
+            item.metadata?.metadata?.title || item.headline;
+          let title = rawTitle?.text || rawTitle?.simple_text || rawTitle;
+          if (title && typeof title === "object" && typeof title.toString === "function") {
+            title = title.toString();
+          }
+          if (typeof title !== "string" || !title.trim()) title = "YouTube video";
+
           seen.add(id);
-          videos.push({ videoId: id, title: item.title?.text || item.title || "YouTube video" });
+          videos.push({ videoId: id, title: title.trim() });
         }
       };
       addItems(playlist.videos?.items || playlist.videos);
