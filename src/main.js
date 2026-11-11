@@ -528,15 +528,31 @@ async function runPlaylistDownloads() {
       progressBar.style.width = pct + "%";
       progressValue.textContent = Math.round(pct) + "%";
       progressLabel.textContent = event.message || "Downloading…";
+      if (playlistRunning) YtDlp.updateBackgroundPlaylist({message: "Playlist download · " + Math.round(pct) + "%"}).catch(() => {});
     });
   }
   let completed = 0, failed = 0;
+  try {
+    await YtDlp.startBackgroundPlaylist({message: "Starting playlist · " + videos.length + " videos"});
+  } catch (error) {
+    playlistRunning = false;
+    start.disabled = false;
+    start.textContent = "Download playlist one by one";
+    status.textContent = error?.message || "Could not start background download service.";
+    return;
+  }
   for (let i = 0; i < videos.length; i++) {
+    try {
+      const cancelState = await YtDlp.getPlaylistCancelState();
+      if (cancelState.cancelled) playlistCancelRequested = true;
+    } catch {}
+    if (playlistCancelRequested) break;
     const video = videos[i];
     const row = $("#playlistItems").children[i];
     const state = row?.querySelector(".playlist-video-state");
     if (state) state.textContent = "Loading…";
     $("#playlistProgressLabel").textContent = "Video " + (i+1) + " of " + videos.length + ": loading";
+    try { await YtDlp.updateBackgroundPlaylist({message: "Video " + (i+1) + " of " + videos.length + " · " + video.title}); } catch {}
     try {
       const info = await readYouTubeDetails("https://www.youtube.com/watch?v=" + encodeURIComponent(video.videoId));
       if (playlistCancelRequested) break;
@@ -552,6 +568,10 @@ async function runPlaylistDownloads() {
       completed++;
       if (state) state.textContent = "✓ Saved";
     } catch (error) {
+      try {
+        const cancelState = await YtDlp.getPlaylistCancelState();
+        if (cancelState.cancelled) playlistCancelRequested = true;
+      } catch {}
       if (playlistCancelRequested) break;
       failed++;
       const reason = String(error?.message || error || "Unknown error").replace(/\\s+/g, " ").trim();
@@ -571,6 +591,7 @@ async function runPlaylistDownloads() {
     $("#playlistProgressBar").style.width = (done * 100 / videos.length) + "%";
     $("#playlistProgressLabel").textContent = "Downloaded " + completed + " · Failed " + failed;
   }
+  try { await YtDlp.stopBackgroundPlaylist(); } catch {}
   playlistRunning = false;
   start.disabled = false;
   start.textContent = playlistCancelRequested ? "Playlist cancelled" : "Playlist finished";
@@ -588,8 +609,19 @@ $("#playlistClose").addEventListener("click", () => {
 $("#playlistBackgroundBtn").addEventListener("click", () => {
   $("#playlistExitModal").hidden = true;
   $("#playlistModal").hidden = true;
-  status.textContent = "Playlist is continuing in the background. Open the playlist panel to check progress.";
+  status.textContent = "Playlist is running in the background. Cancel anytime from Downloads or the notification.";
+  $("#downloadState").innerHTML = '<b>Playlist downloading in background</b><small id="backgroundPlaylistStatus">Your playlist continues while you use other apps.</small><button type="button" class="settings-secondary" id="backgroundPlaylistCancel">Cancel playlist download</button>';
+  $("#backgroundPlaylistCancel").addEventListener("click", cancelPlaylistFromAnywhere);
+  switchTab("downloads");
 });
+async function cancelPlaylistFromAnywhere() {
+  playlistCancelRequested = true;
+  try { await YtDlp.cancelDownload(); } catch {}
+  try { await YtDlp.updateBackgroundPlaylist({message: "Cancelling playlist…"}); } catch {}
+  status.textContent = "Playlist cancellation requested…";
+  const btn = $("#backgroundPlaylistCancel");
+  if (btn) { btn.disabled = true; btn.textContent = "Cancelling…"; }
+}
 $("#playlistCancelBtn").addEventListener("click", async () => {
   playlistCancelRequested = true;
   $("#playlistExitModal").hidden = true;
