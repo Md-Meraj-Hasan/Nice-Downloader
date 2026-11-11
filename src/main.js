@@ -463,7 +463,8 @@ async function previewYouTubeLink(value) {
 }
 
 let activePlaylist = null;
-let playlistRunning = false;\nlet playlistCancelRequested = false;
+let playlistRunning = false;
+let playlistCancelRequested = false;
 
 async function previewYouTubePlaylist(value) {
   if (!Capacitor.isNativePlatform()) { status.textContent = "Playlist downloading is available in the Android APK."; return; }
