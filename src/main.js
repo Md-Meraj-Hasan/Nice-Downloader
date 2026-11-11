@@ -167,7 +167,6 @@ app.innerHTML = `
       <div class="format-meta"><h2 id="playlistExitTitle">Playlist download is running</h2><p>What would you like to do?</p></div>
       <button type="button" class="primary" id="playlistBackgroundBtn">Continue in background</button>
       <button type="button" class="settings-secondary" id="playlistCancelBtn">Cancel playlist download</button>
-      <button type="button" class="settings-secondary" id="playlistKeepBtn">Keep downloading here</button>
     </section>
   </div>
   <div class="format-modal-backdrop" id="formatModal" hidden>
@@ -586,7 +585,6 @@ $("#playlistClose").addEventListener("click", () => {
   if (playlistRunning) $("#playlistExitModal").hidden = false;
   else $("#playlistModal").hidden = true;
 });
-$("#playlistKeepBtn").addEventListener("click", () => { $("#playlistExitModal").hidden = true; });
 $("#playlistBackgroundBtn").addEventListener("click", () => {
   $("#playlistExitModal").hidden = true;
   $("#playlistModal").hidden = true;
