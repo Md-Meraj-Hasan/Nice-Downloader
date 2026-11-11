@@ -539,6 +539,7 @@ async function runPlaylistDownloads() {
     $("#playlistProgressLabel").textContent = "Video " + (i+1) + " of " + videos.length + ": loading";
     try {
       const info = await readYouTubeDetails("https://www.youtube.com/watch?v=" + encodeURIComponent(video.videoId));
+      if (playlistCancelRequested) break;
       const format = selectPlaylistFormat(info.formats, requested);
       if (!format) throw new Error("No compatible MP4 format");
       if (row) row.querySelector(".playlist-video-title").textContent = info.title || video.title;
