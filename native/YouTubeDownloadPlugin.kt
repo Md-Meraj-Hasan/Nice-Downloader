@@ -38,7 +38,7 @@ class YouTubeDownloadPlugin : Plugin() {
     }
 
     private fun playlistServiceIntent(action: String, message: String? = null): Intent =
-        Intent(context, YouTubeDownloadService::class.java).apply {
+        Intent(getContext(), YouTubeDownloadService::class.java).apply {
             this.action = action
             if (message != null) putExtra("message", message)
         }
@@ -47,19 +47,19 @@ class YouTubeDownloadPlugin : Plugin() {
     fun startBackgroundPlaylist(call: PluginCall) {
         cancelActiveDownload = false
         val intent = playlistServiceIntent(YouTubeDownloadService.ACTION_START, call.getString("message") ?: "Preparing playlist…")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) getContext().startForegroundService(intent) else getContext().startService(intent)
         call.resolve()
     }
 
     @PluginMethod
     fun updateBackgroundPlaylist(call: PluginCall) {
-        context.startService(playlistServiceIntent(YouTubeDownloadService.ACTION_UPDATE, call.getString("message") ?: "Downloading playlist…"))
+        getContext().startService(playlistServiceIntent(YouTubeDownloadService.ACTION_UPDATE, call.getString("message") ?: "Downloading playlist…"))
         call.resolve()
     }
 
     @PluginMethod
     fun stopBackgroundPlaylist(call: PluginCall) {
-        context.startService(playlistServiceIntent(YouTubeDownloadService.ACTION_STOP))
+        getContext().startService(playlistServiceIntent(YouTubeDownloadService.ACTION_STOP))
         call.resolve()
     }
 
