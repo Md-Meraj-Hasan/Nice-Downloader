@@ -25,7 +25,10 @@ import kotlin.concurrent.thread
 
 @CapacitorPlugin(
     name = "YtDlp",
-    permissions = [\n        Permission(alias = "storage", strings = [Manifest.permission.WRITE_EXTERNAL_STORAGE]),\n        Permission(alias = "notifications", strings = [Manifest.permission.POST_NOTIFICATIONS])\n    ]
+    permissions = [
+        Permission(alias = "storage", strings = [Manifest.permission.WRITE_EXTERNAL_STORAGE]),
+        Permission(alias = "notifications", strings = [Manifest.permission.POST_NOTIFICATIONS])
+    ]
 )
 class YouTubeDownloadPlugin : Plugin() {
     companion object {
