@@ -56,7 +56,7 @@ const icon = (name) => {
   const paths = {
     home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
     download:'<path d="M12 3v12m-5-5 5 5 5-5M4 19v2h16v-2"/>',
-    paste:'<rect x="8" y="3" width="12" height="15" rx="2"/><path d="M5 7H4a1 1 0 0 0-1 1v13h12a1 1 0 0 0 1-1v-1"/>',
+    cut:'<path d="M6 6l12 12M18 6 6 18"/><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/>',
     link:'<path d="M10 13a5 5 0 0 0 7.1 0l3-3A5 5 0 0 0 13 2.9l-1.7 1.7M14 11a5 5 0 0 0-7.1 0l-3 3A5 5 0 0 0 11 21.1l1.7-1.7"/>',
     video:'<rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 10 4-3v10l-4-3z"/>',
     music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
@@ -88,7 +88,7 @@ app.innerHTML = `
       <div class="section-heading"><div><span class="section-kicker">GET STARTED</span><h2>New download</h2></div><span class="secure-chip">${icon("shield")} On-device</span></div>
       <div class="download-card">
         <label for="urlInput">PASTE YOUR MEDIA LINK</label>
-        <div class="urlbox"><span class="url-icon">${icon("link")}</span><input id="urlInput" type="url" placeholder="Paste YouTube video link here…" autocomplete="url"><button id="pasteBtn" class="paste-btn" aria-label="Paste from clipboard">${icon("paste")}</button></div>
+        <div class="urlbox"><span class="url-icon">${icon("link")}</span><input id="urlInput" type="url" placeholder="Paste YouTube video link here…" autocomplete="url"><button id="clearLinkBtn" class="paste-btn" type="button" aria-label="Clear link" title="Clear link">${icon("cut")}</button></div>
         <select id="quality" hidden><option value="best">Best</option><option value="audio">Audio</option></select>
         
         <button id="downloadBtn" class="primary"><span class="primary-icon">${icon("download")}</span> Load video details <span class="button-arrow">→</span></button>
@@ -229,7 +229,10 @@ async function readYouTubeDetails(videoUrl) {
   const videoId = extractYouTubeVideoId(videoUrl);
   if (!videoId) throw new Error("Unsupported YouTube video link.");
 
-  const clientAttempts = ["ANDROID", "iOS", "WEB"];
+  // Use the Android profile first. Once a client returns progressive MP4
+  // formats, show the result immediately instead of waiting for slower
+  // fallback profiles (iOS and WEB) on every normal link.
+  const clientAttempts = ["ANDROID", "WEB", "iOS"];
   let lastError = null;
   let bestInfo = null;
   let bestFormats = [];
@@ -268,20 +271,17 @@ async function readYouTubeDetails(videoUrl) {
       }
 
       formats.sort((a, b) => b.height - a.height);
-      if (formats.length > bestFormats.length) {
-        bestFormats = formats;
-        bestInfo = { info, youtube, clientType };
-      }
       totalDecipherFailures += decipherFailures;
-      // Try all client profiles because progressive MP4 quality can differ by profile.
+
       if (formats.length) {
-        const known = new Set(bestFormats.map(item => item.url));
-        for (const item of formats) if (!known.has(item.url)) bestFormats.push(item);
-        bestFormats.sort((a, b) => b.height - a.height);
-        if (!bestInfo || formats.length > (bestInfo.formatCount || 0)) {
-          bestInfo = { info, youtube, clientType, formatCount: formats.length };
-        }
+        bestInfo = { info, clientType };
+        bestFormats = formats;
+        break;
       }
+
+      // Keep the first successful metadata response for a useful error
+      // when the video has no compatible progressive MP4 stream.
+      if (!bestInfo) bestInfo = { info, clientType };
     } catch (error) {
       lastError = error;
     }
@@ -526,14 +526,15 @@ async function runPlaylistDownloads() {
 $("#playlistClose").addEventListener("click", () => { if (!playlistRunning) $("#playlistModal").hidden = true; });
 $("#playlistStart").addEventListener("click", runPlaylistDownloads);
 
-$("#pasteBtn").addEventListener("click", async () => {
-  try {
-    input.value = (await navigator.clipboard.readText()).trim();
-    if (!input.value) { status.textContent = "Clipboard is empty."; return; }
-    await previewYouTubeLink(input.value);
-  } catch {
-    status.textContent = "Clipboard unavailable. Paste your link manually.";
-  }
+$("#clearLinkBtn").addEventListener("click", () => {
+  input.value = "";
+  loadedFormatsForUrl = "";
+  activeFormat = null;
+  selectedFormat = "best";
+  $("#formatModal").hidden = true;
+  $("#playlistModal").hidden = true;
+  status.textContent = "Link cleared. Paste a new link.";
+  input.focus();
 });
 
 input.addEventListener("input", () => {
