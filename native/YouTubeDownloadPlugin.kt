@@ -25,7 +25,7 @@ import kotlin.concurrent.thread
 
 @CapacitorPlugin(
     name = "YtDlp",
-    permissions = [Permission(alias = "storage", strings = [Manifest.permission.WRITE_EXTERNAL_STORAGE])]
+    permissions = [\n        Permission(alias = "storage", strings = [Manifest.permission.WRITE_EXTERNAL_STORAGE]),\n        Permission(alias = "notifications", strings = [Manifest.permission.POST_NOTIFICATIONS])\n    ]
 )
 class YouTubeDownloadPlugin : Plugin() {
     companion object {
@@ -43,12 +43,28 @@ class YouTubeDownloadPlugin : Plugin() {
             if (message != null) putExtra("message", message)
         }
 
-    @PluginMethod
-    fun startBackgroundPlaylist(call: PluginCall) {
+    private fun launchPlaylistForegroundService(call: PluginCall) {
         cancelActiveDownload = false
         val intent = playlistServiceIntent(YouTubeDownloadService.ACTION_START, call.getString("message") ?: "Preparing playlist…")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) getContext().startForegroundService(intent) else getContext().startService(intent)
         call.resolve()
+    }
+
+    @PluginMethod
+    fun startBackgroundPlaylist(call: PluginCall) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            getPermissionState("notifications") != PermissionState.GRANTED) {
+            requestPermissionForAlias("notifications", call, "notificationPermissionCallback")
+            return
+        }
+        launchPlaylistForegroundService(call)
+    }
+
+    @PermissionCallback
+    private fun notificationPermissionCallback(call: PluginCall) {
+        // The foreground service still runs if notifications are denied; its cancel
+        // control remains available in the app's Downloads screen.
+        launchPlaylistForegroundService(call)
     }
 
     @PluginMethod
