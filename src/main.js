@@ -93,7 +93,14 @@ const icon = (name) => {
 app.innerHTML = `
 <div class="app-shell">
   <header class="topbar">
-    <div class="brand"><div class="brand-mark"><span></span></div><div class="brand-copy"><b>Nice Downloader</b><small>VIDEO DOWNLOADER</small></div></div>
+    <div class="topbar-brand-row">
+      <div class="brand"><div class="brand-mark"><span></span></div><div class="brand-copy"><b>Nice Downloader</b><small>VIDEO DOWNLOADER</small></div></div>
+    </div>
+    <nav class="top-menu" aria-label="Main menu">
+      <button class="menu-item active" data-tab="home"><span>${icon("download")}</span><b>Download</b></button>
+      <button class="menu-item" data-tab="downloads"><span>${icon("video")}</span><b>Downloads</b></button>
+      <button class="menu-item" data-tab="settings"><span>${icon("settings")}</span><b>Settings</b></button>
+    </nav>
   </header>
 
 
@@ -165,11 +172,6 @@ app.innerHTML = `
       <p class="format-note">Only download content you own or are allowed to save.</p>
     </section>
   </div>
-  <nav class="bottom-nav" aria-label="Download sections">
-    <button class="nav-item active" data-tab="home"><span>${icon("download")}</span><small>Download</small></button>
-    <button class="nav-item" data-tab="downloads"><span>${icon("video")}</span><small>Downloads</small></button>
-    <button class="nav-item" data-tab="settings"><span>${icon("settings")}</span><small>Settings</small></button>
-  </nav>
 </div>`;
 
 const $ = selector => document.querySelector(selector);
