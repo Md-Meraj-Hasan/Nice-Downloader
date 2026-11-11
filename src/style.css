@@ -176,3 +176,11 @@
   .menu-item{gap:5px}
   .menu-item b{font-size:9px}
 }
+
+
+/* Playlist close-choice dialog */
+.playlist-exit-modal{max-width:390px;gap:12px}
+.playlist-exit-modal .format-meta p{margin-top:5px}
+.playlist-exit-modal .primary,
+.playlist-exit-modal .settings-secondary{width:100%;min-height:44px;flex-shrink:0}
+.playlist-exit-modal .settings-secondary{text-align:center}
