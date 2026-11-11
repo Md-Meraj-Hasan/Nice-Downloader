@@ -28,13 +28,49 @@ import kotlin.concurrent.thread
     permissions = [Permission(alias = "storage", strings = [Manifest.permission.WRITE_EXTERNAL_STORAGE])]
 )
 class YouTubeDownloadPlugin : Plugin() {
-    @Volatile private var activeDownloadConnection: HttpURLConnection? = null
-    @Volatile private var cancelActiveDownload = false
+    companion object {
+        @Volatile private var activeDownloadConnection: HttpURLConnection? = null
+        @Volatile private var cancelActiveDownload = false
+        fun cancelFromNotification() {
+            cancelActiveDownload = true
+            activeDownloadConnection?.disconnect()
+        }
+    }
+
+    private fun playlistServiceIntent(action: String, message: String? = null): Intent =
+        Intent(context, YouTubeDownloadService::class.java).apply {
+            this.action = action
+            if (message != null) putExtra("message", message)
+        }
+
+    @PluginMethod
+    fun startBackgroundPlaylist(call: PluginCall) {
+        cancelActiveDownload = false
+        val intent = playlistServiceIntent(YouTubeDownloadService.ACTION_START, call.getString("message") ?: "Preparing playlist…")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun updateBackgroundPlaylist(call: PluginCall) {
+        context.startService(playlistServiceIntent(YouTubeDownloadService.ACTION_UPDATE, call.getString("message") ?: "Downloading playlist…"))
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun stopBackgroundPlaylist(call: PluginCall) {
+        context.startService(playlistServiceIntent(YouTubeDownloadService.ACTION_STOP))
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun getPlaylistCancelState(call: PluginCall) {
+        call.resolve(JSObject().apply { put("cancelled", cancelActiveDownload) })
+    }
 
     @PluginMethod
     fun cancelDownload(call: PluginCall) {
-        cancelActiveDownload = true
-        activeDownloadConnection?.disconnect()
+        cancelFromNotification()
         call.resolve(JSObject().apply { put("cancelling", true) })
     }
 
@@ -181,7 +217,6 @@ class YouTubeDownloadPlugin : Plugin() {
             call.reject("Invalid YouTube media stream URL.")
             return
         }
-        cancelActiveDownload = false
         thread(name = "NiceDownloader-stream") {
             var connection: HttpURLConnection? = null
             var destination: Uri? = null
