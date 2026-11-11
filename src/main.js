@@ -544,8 +544,17 @@ async function runPlaylistDownloads() {
       if (state) state.textContent = "✓ Saved";
     } catch (error) {
       failed++;
-      if (state) state.textContent = "Failed";
-      if (row) row.title = error?.message || String(error);
+      const reason = String(error?.message || error || "Unknown error").replace(/\\s+/g, " ").trim();
+      const shortReason = reason.length > 34 ? reason.slice(0, 31) + "…" : reason;
+      if (state) {
+        state.textContent = "Failed: " + shortReason;
+        state.title = reason;
+        state.setAttribute("aria-label", "Download failed: " + reason);
+      }
+      if (row) {
+        row.title = reason;
+        row.setAttribute("aria-label", "Playlist video " + (i + 1) + " failed: " + reason);
+      }
     }
     const done = completed + failed;
     $("#playlistProgressValue").textContent = done + "/" + videos.length;
