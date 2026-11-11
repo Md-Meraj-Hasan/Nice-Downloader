@@ -25,10 +25,30 @@ async function youtubeNativeFetch(input, init = {}) {
       body = new TextDecoder().decode(body instanceof ArrayBuffer ? new Uint8Array(body) : body);
     } else body = String(body);
   }
-  const result = await YtDlp.httpRequest({
+  const requestOptions = {
     url, method, headers,
     ...(body != null && method !== "GET" && method !== "HEAD" ? { body } : {})
-  });
+  };
+
+  // Android DNS can briefly fail while resolving YouTube hosts (especially
+  // on mobile networks). Retry only DNS-resolution failures; do not delay
+  // normal HTTP errors or other request failures.
+  let result = null;
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      result = await YtDlp.httpRequest(requestOptions);
+      lastError = null;
+      break;
+    } catch (error) {
+      lastError = error;
+      const message = String(error?.message || error || "");
+      const isDnsFailure = /UnknownHostException|Unable to resolve host|No address associated with hostname/i.test(message);
+      if (!isDnsFailure || attempt === 2) throw error;
+      await new Promise(resolve => setTimeout(resolve, attempt === 0 ? 400 : 1000));
+    }
+  }
+  if (lastError || !result) throw lastError || new Error("YouTube network request failed.");
   return new Response(result.body || "", {
     status: Number(result.status) || 200,
     headers: result.headers || {}
