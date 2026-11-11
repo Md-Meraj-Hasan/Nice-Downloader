@@ -41,6 +41,8 @@ if (!appGradle.includes("kotlin-android")) {
 
 const javaDir = path.join("android/app/src/main/java", ...namespace.split("."));
 fs.mkdirSync(javaDir, { recursive: true });
+const serviceSource = fs.readFileSync("native/YouTubeDownloadService.kt", "utf8").replace("__PACKAGE__", namespace);
+fs.writeFileSync(path.join(javaDir, "YouTubeDownloadService.kt"), serviceSource);
 const plugin = fs.readFileSync("native/YouTubeDownloadPlugin.kt", "utf8").replace("__PACKAGE__", namespace);
 fs.writeFileSync(path.join(javaDir, "YouTubeDownloadPlugin.kt"), plugin);
 
@@ -53,8 +55,19 @@ function ensureManifestPermission(permissionXml, permissionName) {
   manifest = manifest.slice(0, applicationTag) + "    " + permissionXml + "\n    " + manifest.slice(applicationTag);
 }
 ensureManifestPermission('<uses-permission android:name="android.permission.INTERNET" />', "android.permission.INTERNET");
+ensureManifestPermission('<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />', "android.permission.FOREGROUND_SERVICE");
+ensureManifestPermission('<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />', "android.permission.FOREGROUND_SERVICE_DATA_SYNC");
+ensureManifestPermission('<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />', "android.permission.POST_NOTIFICATIONS");
 // Legacy file-path writes are used only on Android 9 and below. Android 10+ uses MediaStore.
 ensureManifestPermission('<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />', "android.permission.WRITE_EXTERNAL_STORAGE");
+// Register the persistent notification service used by playlist downloads.
+const serviceTag = '<service android:name="' + namespace + '.YouTubeDownloadService" android:exported="false" android:foregroundServiceType="dataSync" />';
+if (!manifest.includes(namespace + '.YouTubeDownloadService')) {
+  const closeApplication = manifest.indexOf("</application>");
+  if (closeApplication < 0) throw new Error("AndroidManifest application closing tag not found.");
+  manifest = manifest.slice(0, closeApplication) + "        " + serviceTag + "\\n    " + manifest.slice(closeApplication);
+}
+
 // Harden app data and transport defaults. The downloader needs HTTPS only.
 const applicationStart = manifest.indexOf("<application");
 if (applicationStart < 0) throw new Error("AndroidManifest application tag not found for security hardening.");
