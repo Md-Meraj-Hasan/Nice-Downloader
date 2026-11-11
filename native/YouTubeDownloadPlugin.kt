@@ -28,6 +28,16 @@ import kotlin.concurrent.thread
     permissions = [Permission(alias = "storage", strings = [Manifest.permission.WRITE_EXTERNAL_STORAGE])]
 )
 class YouTubeDownloadPlugin : Plugin() {
+    @Volatile private var activeDownloadConnection: HttpURLConnection? = null
+    @Volatile private var cancelActiveDownload = false
+
+    @PluginMethod
+    fun cancelDownload(call: PluginCall) {
+        cancelActiveDownload = true
+        activeDownloadConnection?.disconnect()
+        call.resolve(JSObject().apply { put("cancelling", true) })
+    }
+
     @PluginMethod
     fun getStorageStatus(call: PluginCall) {
         val legacy = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P
