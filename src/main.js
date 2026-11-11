@@ -162,6 +162,14 @@ app.innerHTML = `
       <p class="format-note">Videos download sequentially. Each video uses the selected maximum quality or the nearest lower available MP4 quality.</p>
     </section>
   </div>
+  <div class="format-modal-backdrop playlist-exit-backdrop" id="playlistExitModal" hidden>
+    <section class="format-modal playlist-exit-modal" role="dialog" aria-modal="true" aria-labelledby="playlistExitTitle">
+      <div class="format-meta"><h2 id="playlistExitTitle">Playlist download is running</h2><p>What would you like to do?</p></div>
+      <button type="button" class="primary" id="playlistBackgroundBtn">Continue in background</button>
+      <button type="button" class="settings-secondary" id="playlistCancelBtn">Cancel playlist download</button>
+      <button type="button" class="settings-secondary" id="playlistKeepBtn">Keep downloading here</button>
+    </section>
+  </div>
   <div class="format-modal-backdrop" id="formatModal" hidden>
     <section class="format-modal" role="dialog" aria-modal="true" aria-labelledby="formatTitle">
       <button type="button" class="format-close" id="formatClose" aria-label="Close">×</button>
@@ -455,7 +463,7 @@ async function previewYouTubeLink(value) {
 }
 
 let activePlaylist = null;
-let playlistRunning = false;
+let playlistRunning = false;\nlet playlistCancelRequested = false;
 
 async function previewYouTubePlaylist(value) {
   if (!Capacitor.isNativePlatform()) { status.textContent = "Playlist downloading is available in the Android APK."; return; }
@@ -543,6 +551,7 @@ async function runPlaylistDownloads() {
       completed++;
       if (state) state.textContent = "✓ Saved";
     } catch (error) {
+      if (playlistCancelRequested) break;
       failed++;
       const reason = String(error?.message || error || "Unknown error").replace(/\\s+/g, " ").trim();
       const shortReason = reason.length > 34 ? reason.slice(0, 31) + "…" : reason;
@@ -563,12 +572,33 @@ async function runPlaylistDownloads() {
   }
   playlistRunning = false;
   start.disabled = false;
-  start.textContent = "Playlist finished";
-  status.textContent = "Playlist finished: " + completed + " downloaded, " + failed + " failed.";
+  start.textContent = playlistCancelRequested ? "Playlist cancelled" : "Playlist finished";
+  status.textContent = playlistCancelRequested
+    ? "Playlist cancelled. " + completed + " videos saved; " + failed + " failed."
+    : "Playlist finished: " + completed + " downloaded, " + failed + " failed.";
   downloadSessions += completed;
-  updateDownloadSummary(failed ? "Playlist partial" : "Playlist complete");
+  updateDownloadSummary(playlistCancelRequested ? "Playlist cancelled" : (failed ? "Playlist partial" : "Playlist complete"));
+  if (playlistCancelRequested) $("#playlistModal").hidden = true;
 }
-$("#playlistClose").addEventListener("click", () => { if (!playlistRunning) $("#playlistModal").hidden = true; });
+$("#playlistClose").addEventListener("click", () => {
+  if (playlistRunning) $("#playlistExitModal").hidden = false;
+  else $("#playlistModal").hidden = true;
+});
+$("#playlistKeepBtn").addEventListener("click", () => { $("#playlistExitModal").hidden = true; });
+$("#playlistBackgroundBtn").addEventListener("click", () => {
+  $("#playlistExitModal").hidden = true;
+  $("#playlistModal").hidden = true;
+  status.textContent = "Playlist is continuing in the background. Open the playlist panel to check progress.";
+});
+$("#playlistCancelBtn").addEventListener("click", async () => {
+  playlistCancelRequested = true;
+  $("#playlistExitModal").hidden = true;
+  $("#playlistCancelBtn").disabled = true;
+  $("#playlistProgressLabel").textContent = "Cancelling playlist…";
+  try { await YtDlp.cancelDownload(); } catch {}
+  if (!playlistRunning) $("#playlistModal").hidden = true;
+  $("#playlistCancelBtn").disabled = false;
+});
 $("#playlistStart").addEventListener("click", runPlaylistDownloads);
 
 $("#clearLinkBtn").addEventListener("click", () => {
