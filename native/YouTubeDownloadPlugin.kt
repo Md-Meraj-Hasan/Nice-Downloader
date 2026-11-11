@@ -181,6 +181,7 @@ class YouTubeDownloadPlugin : Plugin() {
             call.reject("Invalid YouTube media stream URL.")
             return
         }
+        cancelActiveDownload = false
         thread(name = "NiceDownloader-stream") {
             var connection: HttpURLConnection? = null
             var destination: Uri? = null
@@ -195,6 +196,7 @@ class YouTubeDownloadPlugin : Plugin() {
                 var offset = if (tempFile.isFile) tempFile.length() else 0L
 
                 connection = URL(raw).openConnection() as HttpURLConnection
+                activeDownloadConnection = connection
                 connection.connectTimeout = 20000
                 connection.readTimeout = 45000
                 connection.instanceFollowRedirects = true
@@ -208,6 +210,7 @@ class YouTubeDownloadPlugin : Plugin() {
                     // If Range is ignored or stale, restart cleanly rather than append duplicate bytes.
                     connection.disconnect()
                     connection = URL(raw).openConnection() as HttpURLConnection
+                    activeDownloadConnection = connection
                     connection.connectTimeout = 20000
                     connection.readTimeout = 45000
                     connection.instanceFollowRedirects = true
@@ -234,6 +237,7 @@ class YouTubeDownloadPlugin : Plugin() {
                             var done = offset
                             var lastProgress = -1
                             while (true) {
+                                if (cancelActiveDownload) throw InterruptedException("Download cancelled by user")
                                 val count = input.read(buffer)
                                 if (count < 0) break
                                 out.write(buffer, 0, count)
@@ -314,9 +318,10 @@ class YouTubeDownloadPlugin : Plugin() {
             } catch (error: Exception) {
                 destination?.let { runCatching { getContext().contentResolver.delete(it, null, null) } }
                 legacyDestination?.let { runCatching { it.delete() } }
-                call.reject("Download failed: ${error.message ?: "network error"}. Incomplete data is kept privately for retry.")
+                call.reject(if (cancelActiveDownload) "Download cancelled by user. Partial data is kept privately for retry." else "Download failed: ${error.message ?: "network error"}. Incomplete data is kept privately for retry.")
             } finally {
                 connection?.disconnect()
+                if (activeDownloadConnection === connection) activeDownloadConnection = null
             }
         }
     }
