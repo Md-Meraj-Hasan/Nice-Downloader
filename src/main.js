@@ -205,12 +205,18 @@ async function readYouTubePlaylist(playlistUrl) {
           videos.push({ videoId: id, title: item.title?.text || item.title || "YouTube video" });
         }
       };
-      addItems(playlist.videos);
+      addItems(playlist.videos?.items || playlist.videos);
       let pages = 0;
       while (playlist.has_continuation && pages < 50 && videos.length < 500) {
-        const next = await playlist.getContinuation();
-        addItems(Array.isArray(next) ? next : (next?.videos || next?.items || []));
-        pages += 1;
+        try {
+          const next = await playlist.getContinuation();
+          addItems(Array.isArray(next) ? next : (next?.videos?.items || next?.videos || next?.items || []));
+          pages += 1;
+          if (!next || (!Array.isArray(next) && !next.videos && !next.items)) break;
+        } catch (continuationError) {
+          if (!videos.length) throw continuationError;
+          break;
+        }
       }
       if (!videos.length) throw new Error("No accessible videos were found in this playlist.");
       return { playlistId, title: playlist.info?.title?.text || playlist.info?.title || "YouTube playlist", videos };
@@ -472,6 +478,14 @@ async function runPlaylistDownloads() {
   start.textContent = "Downloading…";
   const videos = activePlaylist.videos;
   const requested = $("#playlistQuality").value;
+  if (!progressListener) {
+    progressListener = await YtDlp.addListener("downloadProgress", event => {
+      const pct = Math.max(0, Math.min(100, Number(event.progress) || 0));
+      progressBar.style.width = pct + "%";
+      progressValue.textContent = Math.round(pct) + "%";
+      progressLabel.textContent = event.message || "Downloading…";
+    });
+  }
   let completed = 0, failed = 0;
   for (let i = 0; i < videos.length; i++) {
     const video = videos[i];
@@ -520,6 +534,12 @@ $("#pasteBtn").addEventListener("click", async () => {
   } catch {
     status.textContent = "Clipboard unavailable. Paste your link manually.";
   }
+});
+
+input.addEventListener("input", () => {
+  loadedFormatsForUrl = "";
+  activeFormat = null;
+  selectedFormat = "best";
 });
 
 // Automatically preview when a link is pasted into the URL field.
